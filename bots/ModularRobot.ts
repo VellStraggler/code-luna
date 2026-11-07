@@ -265,21 +265,6 @@ export default class ModularRobot implements IGameFighter{
         return best;
     }
 
-    /** Goes off allBlocks to find the closest one to the given object.
-     * Returns null if no block is within 32 pixels of the given object.
-     */
-    setProxyGlobalPosBlock(object: HPImage) {
-        let block: ModularBlock | null = this.closest(object, this.allBlocks)
-        if (block === null) return null
-
-        let center = block.image.getCenter()
-        if (XY.distance(xy(center.x,center.y), xy(object.getCenter().x, object.getCenter().y)) < BLOCK_RES * 1.5) {
-            this.proxyGlobalBlock = block
-        } else {
-            this.proxyGlobalBlock = null;
-        }
-    }
-
     addChildBlock(offset: XY, block:ModularBlock) {
         block.localPos = offset
         block.parentBlock = this.sourceBlock
@@ -349,8 +334,6 @@ export default class ModularRobot implements IGameFighter{
             if (this.hp <= 0) return
         }
 
-        this.setProxyGlobalPosBlock(this.scene.player)
-
         this.currentCharge -= (this.energyUsePerMs) * delta
         if (this.proxyGlobalBlock !== null) {
             if (this.proxyGlobalBlock.image.body !== null && this.proxyGlobalBlock.image.body !== undefined) {
@@ -375,10 +358,9 @@ export default class ModularRobot implements IGameFighter{
 
         if (this.goal != null) {
             this.stepToPosition(this.goal)
-            if (XY.distance(this.goal, this.getPosition()) < BLOCK_RES) {
+            if (XY.distance(this.goal, this.getPosition()) < BLOCK_RES*1.5) {
                 this.goal = null
                 this.wheelsUseEnergy(false)
-                console.log("done running")
             }
         }
     }
@@ -422,6 +404,11 @@ export default class ModularRobot implements IGameFighter{
                 this.storedLunestone += amt * STONE_MINE_RATE
                 this.isMiningThis?.takeDamage(amt)
             }
+            if (!this.scene.sound.isPlaying("drilling")) {
+                this.scene.sound.play("drilling")
+            }
+        } else {
+            this.scene.sound.stopByKey("drilling")
         }
         this.isMiningThis = null
     }

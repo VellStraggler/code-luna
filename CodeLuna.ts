@@ -34,6 +34,7 @@ export default class MainScene extends Phaser.Scene {
 
     laserSound!: HTMLAudioElement
     painSound!: HTMLAudioElement
+    drillSound!: HTMLAudioElement
 
     constructor() {
         super('MainScene')
@@ -50,8 +51,13 @@ export default class MainScene extends Phaser.Scene {
             this.load.image(asset + F1, (prefix + asset + F1 + suffix))
         })
         
-        this.laserSound = new Audio(prefix + "audio/laser.mp3")
+        let audioPre = prefix + "audio/"
+        this.load.audio("laser", audioPre + "laser.mp3")
+        this.load.audio("pain", audioPre + "pain.mp3")
+        this.load.audio("drilling", audioPre + "drilling.wav", {loop: true, volume: 0.5})
+        this.laserSound = new Audio(prefix + "audio/laser.wav")
         this.painSound = new Audio(prefix + "audio/pain.mp3")
+        this.drillSound = new Audio(prefix + "audio/drilling.mp3")
     }
 
     create() {
@@ -140,7 +146,6 @@ export default class MainScene extends Phaser.Scene {
 
     createPlayer() {
         this.player = new Player(this, 400, 350, 'player/down-f0')
-        this.player.setSize(12,16).setDrag(700).setDepth(BLOCK_DEPTH)
         this.cameras.main.startFollow(this.player)
         this.player.hurtSound = this.painSound
     }

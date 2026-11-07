@@ -2,10 +2,8 @@ import MainScene from "../CodeLuna"
 import Logic from "../main/logic"
 import { xy } from "../main/xy"
 import { BlockType } from "./parts/BlockType"
-import ModularBlock from "./parts/ModularBlock"
 import ModularRobot from "./ModularRobot"
 import { PartType } from "./parts/PartType"
-import WheelBlock from "./parts/WheelBlock"
 import { MINING_RATE_MS } from "../main/constants"
 
 export default class ModularRobots {

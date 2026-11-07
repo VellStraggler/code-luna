@@ -17,7 +17,7 @@ export default class BlockBuilder {
                     robot, parentBlock)
             default:
                 return new ModularBlock(scene, xy,
-                    blockType, parentBlock)
+                    blockType, robot, parentBlock)
         }
     }
 }

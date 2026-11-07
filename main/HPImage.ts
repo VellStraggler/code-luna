@@ -168,6 +168,12 @@ export default class HPImage extends Phaser.Physics.Arcade.Image implements IGam
         this.hpBar?.setPosition(this.x-HP_X_OFFSET,this.y-HP_Y_OFFSET-HP_HALF_HEIGHT)
     }
 
+    override setScale(amt: number) {
+        super.setScale(amt)
+        this.shadow?.setScale(amt)
+        return this
+    }
+
     public aim(target: XY) {
         // do nothing
     }

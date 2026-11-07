@@ -5,6 +5,7 @@ import ModularBlock from "./ModularBlock";
 import IGameItem from "../contracts/IGameItem";
 import MainScene from "../../CodeLuna";
 import BaseGameItem from "../contracts/BaseGameItem";
+import HPImage from "../../main/HPImage";
 
 export class ModularPart extends BaseGameItem {
     parentBlock: ModularBlock;
@@ -31,8 +32,8 @@ export class ModularPart extends BaseGameItem {
         super(
             scene, 
             parentBlock.globalPos, 
-            scene.physics.add.image(x, y, type).setDepth(PART_DEPTH)
-                .setTexture(type),
+            new HPImage(scene, x, y, type, true)
+                .setDepth(PART_DEPTH),
             partType.assetName,
             partType.availableFrames -1
         )

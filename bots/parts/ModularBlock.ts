@@ -26,6 +26,7 @@ export default class ModularBlock extends BaseGameItem {
         scene: MainScene,
         position:XY, 
         blockType: BlockType, 
+        robot: ModularRobot | null = null,
         parentBlock: ModularBlock | null = null
     ) {
         let globalPos = position
@@ -48,13 +49,23 @@ export default class ModularBlock extends BaseGameItem {
         this.parentBlock = parentBlock
         this.blockType = blockType
 
+        if(robot != null) {
+            this.addCollision(scene, robot)
+        }
+
         // derive starting health from the blockType
         this.hp = blockType.strength
 
         this.image.setBodySize(BLOCK_RES-2, BLOCK_RES-2, true)
-        this.image.setDrag(DEFAULT_DRAG).setDepth(BLOCK_DEPTH)
+            .setDrag(DEFAULT_DRAG)
+            .setDepth(BLOCK_DEPTH)
         scene.baseLayer.push(this.image)
+    }
 
+    public addCollision(scene: MainScene, robot: ModularRobot) {
+        scene.physics.add.collider(scene.player, this.image, () => {
+            robot.proxyGlobalBlock = this
+        })
     }
 
     /** adds block to this block's list of children. Assigns global position and this as the parent block.

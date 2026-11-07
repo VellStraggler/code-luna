@@ -15,7 +15,8 @@ export default class WheelBlock extends ModularBlock {
         super(
             scene,
             position, 
-            BlockType.wheel, 
+            BlockType.wheel,
+            robot,
             parentBlock
         )
         this.chassisImage = null
