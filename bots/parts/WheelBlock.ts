@@ -1,0 +1,70 @@
+import MainScene from "../../CodeLuna";
+import { BLOCK_DEPTH, BLOCK_RES, Dirs, WHEEL_CHASSIS_NAME } from "../../main/constants";
+import Logic from "../../main/logic";
+import { xy, XY } from "../../main/xy";
+import ModularRobot from "../ModularRobot";
+import { BlockType } from "./BlockType";
+import ModularBlock from "./ModularBlock";
+import * as Phaser from 'phaser'
+
+export default class WheelBlock extends ModularBlock {
+    chassisImage: Phaser.Physics.Arcade.Image | null
+    robot: ModularRobot
+
+    constructor(scene: MainScene, position: XY, robot: ModularRobot, parentBlock: ModularBlock | null = null) {
+        super(
+            scene,
+            position, 
+            BlockType.wheel, 
+            parentBlock
+        )
+        this.chassisImage = null
+        let dir = Logic.getDir(parentBlock?.localPos ?? xy(), position)
+        this.createChassis(dir)
+        this.robot = robot
+    }
+
+    public createChassis(dir: Dirs): void {
+        let x = this.globalPos.x + this.localPos.x
+        let y = this.globalPos.y + this.localPos.y
+        
+        this.chassisImage = this.scene.physics.add.image(x, y, WHEEL_CHASSIS_NAME)
+        .setBodySize(BLOCK_RES-2, BLOCK_RES-2, true)
+        .setDepth(BLOCK_DEPTH + 50)
+        this.scene.baseLayer.push(this.chassisImage)
+        this.rotateChassis(dir)
+    }
+    
+    public override rotateChassis(dir: Dirs): void {
+        this.chassisImage?.setRotation(this.determineChassisRotation(dir))
+    }
+    private determineChassisRotation(dir: Dirs): number {
+        let baseRotation = 0
+        switch (dir) {
+            case (Dirs.left):
+                baseRotation =3
+                break
+            case (Dirs.right):
+                baseRotation = 1
+                break
+            case (Dirs.down):
+                baseRotation = 2
+                break
+            default: //up
+                break
+        }
+        
+        return Math.PI/2 * baseRotation
+    }
+
+    update(animate: boolean = false) {
+        super.update(animate)
+
+        let newx = this.globalPos.x + this.localPos.x
+        let newy = this.globalPos.y + this.localPos.y
+        this.chassisImage?.setPosition(newx, newy)
+
+        this.image.setRotation(this.robot.movingDirectionRadians)
+
+    }
+}
