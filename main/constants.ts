@@ -57,6 +57,7 @@ export const HP_BG_WIDTH = 42
 export const HP_FG_WIDTH = 40
 export const HP_BG_HEIGHT = 6
 export const HP_FG_HEIGHT = 4
+export const SHADOW_OFFSET = xy(4,-2)
 
 export const GUI_DEPTH =    500
 export const GUI_BG_DEPTH = 490

@@ -5,7 +5,7 @@ import MainStats from "./main/MainStats"
 import Player, { PlayerState } from "./main/Player"
 import GUI from "./main/gui"
 import HPImage from './main/HPImage'
-import { BASIC_ASSET_NAMES, WINDOW, BLOCK_RES, LASER_TEST_MS, FRAME_TIME_MS, BASE_POS, GAME_SPEED, REFINEMENT_RATE_MS, MINING_RATE_MS, COSMORITE_ORE, TWO_FRAME_ASSETS, F1, F0 } from './main/constants'
+import { BASIC_ASSET_NAMES, WINDOW, BLOCK_RES, LASER_TEST_MS, FRAME_TIME_MS, BASE_POS, GAME_SPEED, REFINEMENT_RATE_MS, MINING_RATE_MS, COSMORITE_ORE, TWO_FRAME_ASSETS, F1, F0, BLOCK_DEPTH } from './main/constants'
 import IGameFighter from './bots/contracts/IGameFighter'
 import { XY, xy } from './main/xy'
 import LaserShot from './bots/LaserShot'
@@ -129,7 +129,7 @@ export default class MainScene extends Phaser.Scene {
     }
 
     createOre(x = 0, y = 0) {
-        this.cosmoriteOre = new HPImage(this, x, y, COSMORITE_ORE) 
+        this.cosmoriteOre = new HPImage(this, x, y, COSMORITE_ORE, false) 
             .setImmovable(true)
         
         this.physics.add.collider(this.player, this.cosmoriteOre, () => {
@@ -139,8 +139,8 @@ export default class MainScene extends Phaser.Scene {
     }
 
     createPlayer() {
-        this.player = new Player(this, 400, 400, 'player/down-f0')
-        this.player.setSize(12,16).setDrag(700).setDepth(100)
+        this.player = new Player(this, 400, 350, 'player/down-f0')
+        this.player.setSize(12,16).setDrag(700).setDepth(BLOCK_DEPTH)
         this.cameras.main.startFollow(this.player)
         this.player.hurtSound = this.painSound
     }

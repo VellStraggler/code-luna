@@ -40,7 +40,7 @@ export default class ModularBlock extends BaseGameItem {
         super(
             scene,
             parentBlock?.globalPos ?? position,
-            scene.physics.add.image(x, y, blockType.assetName),
+            new HPImage(scene, x, y, blockType.assetName),
             blockType.assetName,
             blockType.availableFrames -1
         )
@@ -209,9 +209,7 @@ export default class ModularBlock extends BaseGameItem {
      * Handles velocity clamping as well
     */
     override update(animateScene: boolean = false) {
-        if (this.image.body == undefined) {
-            return
-        }
+        if (this.image.body == undefined) return
         if (this.parentBlock != null) {
             let x = this.globalPos.x + this.localPos.x
             let y = this.globalPos.y + this.localPos.y
@@ -221,10 +219,12 @@ export default class ModularBlock extends BaseGameItem {
                 this.image.setVelocity(newV.x, newV.y)
             }
         } else { // This is the eldest parent block
-            // Derive position from physics 
+            // Derive position from physics
+             
             let newPos = this.image.getCenter()
             this.globalPos.x = newPos.x
             this.globalPos.y = newPos.y 
+            this.image.updateShadow()
         }
         // velocity clamping
         if (this.image.body!.velocity.length() > MAX_SPEED) {

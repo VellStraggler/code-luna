@@ -1,10 +1,11 @@
 import MainScene from "../../CodeLuna";
 import { generateId, IMPLEMENTATION_ERROR } from "../../main/constants";
+import HPImage from "../../main/HPImage";
 import { xy, XY } from "../../main/xy";
 import IGameItem from "./IGameItem";
 
 export default class BaseGameItem implements IGameItem {
-    image: Phaser.Physics.Arcade.Image
+    image: HPImage
     readonly id: number
     localPos: XY = xy()
     globalPos: XY
@@ -17,7 +18,7 @@ export default class BaseGameItem implements IGameItem {
     constructor(
         scene: MainScene, 
         globalPos: XY,
-        image: Phaser.Physics.Arcade.Image,
+        image: HPImage,
         itemName: string,
         maxFrames: number
     ) {
