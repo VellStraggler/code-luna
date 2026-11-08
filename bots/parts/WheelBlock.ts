@@ -1,5 +1,5 @@
 import MainScene from "../../CodeLuna";
-import { BLOCK_DEPTH, BLOCK_RES, Dirs, WHEEL_CHASSIS_NAME } from "../../main/constants";
+import { BLOCK_DEPTH, BLOCK_RES, Dirs, ENERGY_MS_PER_WHEEL, WHEEL_CHASSIS_NAME } from "../../main/constants";
 import Logic from "../../main/logic";
 import { xy, XY } from "../../main/xy";
 import ModularRobot from "../ModularRobot";
@@ -67,5 +67,12 @@ export default class WheelBlock extends ModularBlock {
 
         this.image.setRotation(this.robot.movingDirectionRadians)
 
+    }
+
+    override getEnergyUse() {
+        if (this.isActive) {
+            return ENERGY_MS_PER_WHEEL
+        }
+        return 0
     }
 }

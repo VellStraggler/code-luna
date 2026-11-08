@@ -1,4 +1,3 @@
-import ModularRobot from "../bots/ModularRobot";
 import MainScene from "../CodeLuna";
 
 export default class MainStats {
@@ -6,8 +5,6 @@ export default class MainStats {
     private cosmoriteGas: number;
 
     private energyUsePerMs: number = 0;
-
-    private static refinedGasPercent = 0.66;
 
     constructor(lunestone: number = 0, cosmoriteGas: number = 0) {
         this.lunestone = lunestone;
@@ -17,17 +14,6 @@ export default class MainStats {
 
     getEnergyUseMs() {
         return this.energyUsePerMs
-    }
-    calcEnergyUseMs(scene: MainScene) {
-        let total = 0
-        scene.robots.robots.forEach(robot => {
-            total += robot.energyUsePerMs
-        })
-        this.energyUsePerMs = Math.max(0,total)
-    }
-    /** in seconds*/
-    calcTimeLeft() {
-        return this.cosmoriteGas / (this.energyUsePerMs * 1000);
     }
     deltaDrainGas(delta:number) {
         this.incGas(-delta*this.energyUsePerMs);

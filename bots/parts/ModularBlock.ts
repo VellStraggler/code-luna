@@ -250,5 +250,6 @@ export default class ModularBlock extends BaseGameItem {
         for(const block of this.childBlocks) {
             block.update(animateScene)
         }
+
     }
 }

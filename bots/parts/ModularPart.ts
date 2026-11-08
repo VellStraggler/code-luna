@@ -45,6 +45,14 @@ export class ModularPart extends BaseGameItem {
         this.localPos = ModularPart.localPoses[spots-1][index]
     }
 
+    /** 0 if part is not activated. */
+    public override getEnergyUse() {
+        if (this.isActive) {
+            return this.partType.energyUsePerMs
+        }
+        return 0
+    }
+
     override update(animateFrame: boolean = true) {
         let x = this.parentBlock.globalPos.x + this.parentBlock.localPos.x + this.localPos.x + this.partType.offset.x
         let y = this.parentBlock.globalPos.y + this.parentBlock.localPos.y + this.localPos.y + this.partType.offset.y

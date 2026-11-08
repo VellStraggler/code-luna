@@ -51,7 +51,6 @@ export default class GUI {
             .addIconStatLine('icon-lunestone', 'Lunestone: ', () => this.mainStats.getLunestone())
             .addIconStatLine('icon-refined-cosmorite', 'Cosmorite Gas: ', () => this.mainStats.getGas())
             .addIconStatLine('part-battery', 'Energy Use Per Second: ', () => {this.mainStats.getEnergyUseMs() * 1000})
-            .addStatLine('Seconds To Depletion: ', () => this.mainStats.calcTimeLeft())
     }
 
     private hideAll() {
@@ -157,9 +156,10 @@ export default class GUI {
             .addStatLine("stored lunestone: ", () => this.robotOfCPU?.storedLunestone)
             .addStatLine("stored cosmorite: ", () => this.robotOfCPU?.storedCosmorite)
             .addStatLine("storage limit: ", () => this.robotOfCPU?.storageSpace)
-            .addStatLine("meter range: ", () => this.robotOfCPU?.getMeterRange())
-            .addButtonLine("sendToMine", () => this.robotOfCPU?.moveToPosition(this.scene.debug_getMineSiteXY()))
-            .addButtonLine("sendHome", () => this.robotOfCPU?.moveToPosition(this.scene.base.getPosition()))
+            .addStatLine("seconds left: ", () => this.robotOfCPU?.calcTimeLeft())
+            .addStatLine("Estimated range (meters): ", () => this.robotOfCPU?.getMeterRange())
+            .addButtonLine("sendToMine", () => this.robotOfCPU?.setGoal(this.scene.debug_getMineSiteXY()))
+            .addButtonLine("sendHome", () => this.robotOfCPU?.setGoal(this.scene.base.getPosition()))
     }
 
     private initCommandGUI() {

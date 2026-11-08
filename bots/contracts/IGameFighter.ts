@@ -7,6 +7,6 @@ export default interface IGameFighter {
     takeDamage(amt:number, target:any): void
     getHitboxes(): Phaser.Physics.Arcade.Image[]
     canShoot(): boolean
-    shootLaser(): number
+    shootLaser(): any
     aim(target:XY): void
 }

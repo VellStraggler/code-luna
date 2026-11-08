@@ -52,7 +52,7 @@ export default class ModularRobots {
 
     debug_moveAllRobots(x:number, y:number) {
         for(const robot of this.scene.robots) {
-            robot.moveToPosition(xy(robot.getPosition().x + x, robot.getPosition().y + y))
+            robot.setGoal(xy(robot.getPosition().x + x, robot.getPosition().y + y))
         }
     }
 

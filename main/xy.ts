@@ -74,6 +74,10 @@ export class XY {
         }
         return xy(x,y)
     }
+
+    equals(other: XY) {
+        return other.x == this.x && other.y == this.y
+    }
 }
 export function xy(x:number =0, y:number =0) {
     return new XY(x,y)

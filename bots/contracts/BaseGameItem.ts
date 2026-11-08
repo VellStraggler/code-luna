@@ -14,6 +14,7 @@ export default class BaseGameItem implements IGameItem {
     rotation: number;
     scene: MainScene
     itemName: string
+    isActive: boolean = true
     
     constructor(
         scene: MainScene, 
@@ -30,7 +31,21 @@ export default class BaseGameItem implements IGameItem {
         this.globalPos = globalPos
         this.image = image
         this.itemName = itemName
+        
         scene.baseLayer.push(this.image)
+
+        this.updateAnimation(true)
+        this.deactivate()
+    }
+
+    public activate() {
+        this.isActive = true
+    }
+    public deactivate() {
+        this.isActive = false
+    }
+    public getEnergyUse() {
+        return 0
     }
 
     rotate(amount:number = 0) {
@@ -42,7 +57,7 @@ export default class BaseGameItem implements IGameItem {
     }
 
     updateAnimation(animateFrame: boolean): void {
-        if (animateFrame) {
+        if (animateFrame && this.isActive) {
             if (this.maxFrame > 0) {
                 this.currentFrame = (this.currentFrame + 1)%(this.maxFrame + 1)
                 this.image.setTexture(this.getFrameName())

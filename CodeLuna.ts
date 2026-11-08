@@ -195,9 +195,6 @@ export default class MainScene extends Phaser.Scene {
     update(_time: number, delta: number) {
         const distance = GAME_SPEED * (delta / 1000)
 
-        /// Energy Use ///
-        this.mainStats.calcEnergyUseMs(this)
-
         if(_time > this.prevShotTime + LASER_TEST_MS) {
             // this.debug_shootAllLasers()
             this.prevShotTime = _time
@@ -258,10 +255,9 @@ export default class MainScene extends Phaser.Scene {
 
     public async debug_shootAllLasers() {
         for (const robot of this.robots) {
-            const use = robot.shootLaser()
-            if (use > 0) {
+            if (robot.canShoot()) {
+                robot.shootLaser()
                 this.shootAtObject(robot, this.player)
-                this.mainStats.drainGas(use)
             }
         }
     }

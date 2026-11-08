@@ -67,8 +67,8 @@ export const BLOCK_DEPTH =  200
 export const SHADOW_DEPTH = 100
 
 export const HR_IN_MS = 60*60*1000
-export const ENERGY_USE_MULT = 0.00001
-export const ENERGY_MS_PER_WHEEL = 0.00005 
+export const ENERGY_USE_MULT = 0.0001
+export const ENERGY_MS_PER_WHEEL = 0.0005 
 export const LASER_ENERGY_USE = 1
 export const LASER_SPEED = 400
 export const LASER_LIFE = 2
