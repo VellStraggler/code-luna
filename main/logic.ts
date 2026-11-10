@@ -1,5 +1,5 @@
 import { Dirs } from "./constants";
-import { XY } from "./xy";
+import { xy, XY } from "./xy";
 import * as Phaser from 'phaser'
 
 export default class Logic {
@@ -19,5 +19,22 @@ export default class Logic {
             return Dirs.down
         } else
             return Dirs.up
+    }
+
+    public static parseOrigin(align: string) {
+        let origin = xy()
+        switch(align) {
+            case "left":
+                break
+            case "right":
+                origin.x = 1
+                break
+            case "center":
+                origin.x = 0.5
+                break
+            default:
+                break
+        }
+        return origin
     }
 }

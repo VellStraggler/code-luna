@@ -39,6 +39,8 @@ export const GUI_TEXT_START = xy(
 export const BATTERY_SIZE = 10
 export const BLOCK_RES = 16
 export const TEXT_SPACING = 20
+export const TOOLBOX_WIDTH = 20
+export const TOOLBOX_SPACING = 4
 export const BASE_POS = xy(300,300)
 export const GAME_SPEED = 8000
 

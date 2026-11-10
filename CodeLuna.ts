@@ -102,7 +102,7 @@ export default class MainScene extends Phaser.Scene {
         /// Player Firing Laser
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
             if(
-                this.GUI.showingCommandGUI || 
+                this.GUI.baseGUI.isVisible || 
                 this.player.playerState != PlayerState.holdingGun
             ) return
             this.shootAtMousePosition(this.player, pointer)
@@ -233,11 +233,11 @@ export default class MainScene extends Phaser.Scene {
         /// BASE GUI ///
         if(this.base.isOverlapped) {
             this.player.setVisible(false)
-            this.GUI.toggleCommandGUI(true)
+            this.GUI.toggleBaseGUI(true)
 
             this.base.isOverlapped = false
         } else {
-            this.GUI.toggleCommandGUI(false)
+            this.GUI.toggleBaseGUI(false)
             this.player.setVisible(true)
         }
         this.GUI.update()

@@ -1,19 +1,29 @@
 import MainScene from "../CodeLuna"
 import { GUI_DEPTH, TEXT_SPACING } from "./constants"
+import Logic from "./logic"
 import { XY, xy } from "./xy"
 
 export class UITextLine {
     public readonly textObject: Phaser.GameObjects.Text
+    public origin: XY = xy()
 
     constructor(
         scene: MainScene, 
         x:number, 
         y:number, 
-        staticText: string
+        staticText: string,
+        align: string = "left"
     ) {
+        this.parseOrigin(align)
         this.textObject = scene.add.text(x, y, staticText)
             .setScrollFactor(0)
             .setDepth(GUI_DEPTH)
+            .setOrigin(this.origin.x, this.origin.y)
+    }
+
+    public parseOrigin(align: string) {
+        this.origin = Logic.parseOrigin(align)
+        return this.origin
     }
 
     public getNextLineXY(): XY {
@@ -40,9 +50,10 @@ export default class UIStatLine extends UITextLine {
         x:number, 
         y:number, 
         staticPrefix: string, 
-        getVariable: () => any
+        getVariable: () => any,
+        align: string = "left"
     ) {
-        super(scene, x, y, staticPrefix)
+        super(scene, x, y, staticPrefix, align)
         this.getVariable = getVariable
         this.statObject = scene.add.text(
             x + this.textObject.width, 
@@ -51,6 +62,7 @@ export default class UIStatLine extends UITextLine {
         )
             .setScrollFactor(0)
             .setDepth(GUI_DEPTH)
+            .setOrigin(this.origin.x, this.origin.y)
     }
 
     public override updateState(): string {
@@ -70,12 +82,13 @@ export class UIIconStatLine extends UIStatLine {
         x:number, y:number, 
         iconName: string, 
         staticPrefix: string, 
-        getVariable: () => any
+        getVariable: () => any,
+        align: string = "left"
     ) {
-        super(scene, x + TEXT_SPACING, y, staticPrefix, getVariable)
+        super(scene, x + TEXT_SPACING, y, staticPrefix, getVariable, align)
         this.iconObject = scene.add.image(x, y, iconName)
             .setScrollFactor(0)
-            .setOrigin(0,0)
+            .setOrigin(this.origin.x, this.origin.y)
             .setDepth(GUI_DEPTH)
     }
 
@@ -94,16 +107,17 @@ export class UITextButtonLine extends UITextLine {
         x:number, 
         y:number, 
         staticPrefix: string, 
-        onClick: () => any
+        onClick: () => any,
+        align: string = "left"
     ) {
-        super(scene, x, y, "-" + staticPrefix + "()")
-
+        super(scene, x, y, "-" + staticPrefix + "()", align)
         this.textObject
             .setFontStyle('bold')
             .setInteractive()
             .on('pointerdown', () => {
                 onClick()
             })
+            .setOrigin(this.origin.x, this.origin.y)
     }
 }
 
@@ -113,15 +127,16 @@ export class UIStatButtonLine extends UIStatLine {
         x:number, 
         y:number, 
         staticPrefix: string, 
-        onClick: () => string
+        onClick: () => string,
+        align: string = "left"
     ) {
-        super(scene, x, y, staticPrefix, () => {return onClick()})
-
+        super(scene, x, y, staticPrefix, () => {return onClick()}, align)
         this.textObject
             .setFontStyle('bold')
             .setInteractive()
             .on('pointerdown', () => {
                 onClick()
             })
+            .setOrigin(this.origin.x, this.origin.y)
     }
 }
