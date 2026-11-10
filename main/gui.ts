@@ -1,27 +1,27 @@
 import MainStats from "./MainStats"
 import MainScene from "../CodeLuna"
 import { xy } from "./xy"
-import { HIDE_POS, GUI_DEPTH, WINDOW, GUI_SIZE, GUI_TEXT_START, TEXT_SPACING, TOOLBOX_WIDTH, TOOLBOX_SPACING } from "./constants"
+import { HIDE_POS, GUI_DEPTH, WINDOW, GUI_SIZE, GUI_TEXT_START, TEXT_SPACING, TOOLBOX_WIDTH, TOOLBOX_SPACING, FACTORY_BLOCK, PART_GUN_NAME, WELDER_PART, F0 } from "./constants"
 import MyColors from "./MyColors"
 import ModularRobot from "../bots/ModularRobot"
 import { GuiState } from "../bots/parts/CpuPart"
 import Logic from "./logic"
-import UITextColumn from "./UITextColumn"
+import UIColumn from "./UITextColumn"
 import { PlayerState } from "./Player"
 
 export default class GUI {
     private scene: MainScene
 
     mainStats: MainStats
-    public hud!: UITextColumn
+    public hud!: UIColumn
 
     public guiRects: Phaser.GameObjects.Rectangle[] = []
 
-    public baseGUI!: UITextColumn
+    public baseGUI!: UIColumn
 
-    public robotGUI!: UITextColumn
+    public robotGUI!: UIColumn
 
-    public playerTools!: UITextColumn
+    public playerTools!: UIColumn
 
     public messageOpenRobotGUI!: Phaser.GameObjects.Text
     public robotOfCPU: ModularRobot | null = null
@@ -47,7 +47,7 @@ export default class GUI {
     }
 
     private initHud() {
-        this.hud = new UITextColumn(this.scene, TEXT_SPACING, TEXT_SPACING, true)
+        this.hud = new UIColumn(this.scene, TEXT_SPACING, TEXT_SPACING, true)
             .addIconStatLine('icon-lunestone', 'Lunestone: ', () => this.mainStats.getLunestone())
             .addIconStatLine('icon-refined-cosmorite', 'Cosmorite Gas: ', () => this.mainStats.getGas())
             .addIconStatLine('part-battery', 'Energy Use Per Second: ', () => {this.mainStats.getEnergyUseMs() * 1000})
@@ -152,48 +152,35 @@ export default class GUI {
     }
 
     private initPlayerTools() {
-        let startX = WINDOW.x - TEXT_SPACING
+        let startX = WINDOW.x - TEXT_SPACING - TOOLBOX_SPACING
         let startY = WINDOW.y/2 - (1 * (TOOLBOX_WIDTH + 4))
 
-        this.playerTools = new UITextColumn(
+        this.playerTools = new UIColumn(
             this.scene, 
             startX, 
             startY,
             true,
-            TOOLBOX_WIDTH * 5,
-            (TOOLBOX_WIDTH) * 4,
-            MyColors.black,
             "right"
         )
-            .addButtonLine("Gun", () => this.scene.player.playerState = PlayerState.holdingGun)
-            .addButtonLine("Factory", () => this.scene.player.playerState = PlayerState.holdingFactoryBlock)
-            .addButtonLine("None", () => this.scene.player.playerState = PlayerState.holdingNothing)
-            .addButtonLine("Weld", () => this.scene.player.playerState = PlayerState.holdingWelder)
-        for (let y = 0; y < 3; y++) {
-
-            // let box = this.scene.add.rectangle(
-            //     WINDOW.x - TOOLBOX_WIDTH, WINDOW.y/2 + ((y-1) * (TOOLBOX_WIDTH + 4)),
-            //     TOOLBOX_WIDTH, TOOLBOX_WIDTH,
-            //     MyColors.white
-            // )
-            // this.guiRects.push(box)
-        }
+            .addIconButton(PART_GUN_NAME, () => this.scene.player.toggleHoldingGun())
+            .addIconButton(WELDER_PART + F0, () => this.scene.player.toggleHoldingWelder())
+            .addIconButton(FACTORY_BLOCK, () => this.scene.player.toggleHoldingFactoryBlock())
     }
 
     private initCpuGUI() {
-        this.robotGUI = new UITextColumn(this.scene, GUI_TEXT_START.x, GUI_TEXT_START.y, false)
+        this.robotGUI = new UIColumn(this.scene, GUI_TEXT_START.x, GUI_TEXT_START.y, false)
             .addStatLine("blocks: ", () => this.robotOfCPU?.allBlocks.length)
             .addStatLine("stored lunestone: ", () => this.robotOfCPU?.storedLunestone)
             .addStatLine("stored cosmorite: ", () => this.robotOfCPU?.storedCosmorite)
             .addStatLine("storage limit: ", () => this.robotOfCPU?.storageSpace)
             .addStatLine("seconds left: ", () => this.robotOfCPU?.calcTimeLeft())
-            .addStatLine("Estimated range (meters): ", () => this.robotOfCPU?.getMeterRange())
+            .addStatLine("Estimated range (m): ", () => this.robotOfCPU?.getMeterRange())
             .addButtonLine("sendToMine", () => this.robotOfCPU?.setGoal(this.scene.debug_getMineSiteXY()))
             .addButtonLine("sendHome", () => this.robotOfCPU?.setGoal(this.scene.base.getPosition()))
     }
 
     private initCommandGUI() {
-        this.baseGUI = new UITextColumn(this.scene, GUI_TEXT_START.x, GUI_TEXT_START.y, false)
+        this.baseGUI = new UIColumn(this.scene, GUI_TEXT_START.x, GUI_TEXT_START.y, false)
             .addButtonLine("Build bot", () => {this.scene.debug_summonRobot()})
             .addButtonLine("Locate Mineral Site: ", () => {this.scene.debug_getMineSiteString()})
             .addButtonLine("Move 100 UP    ^: ", () => {this.scene.robots.debug_moveAllRobots(0,-100)})
@@ -212,14 +199,24 @@ export default class GUI {
 
     public toggleBaseGUI(visible:boolean) {
         if(this.baseGUI.isVisible == visible) return
-        if (visible) this.robotGUI.setVisibility(false)
+        if (visible) {
+            this.robotGUI.setVisibility(false)
+            this.playerTools.setVisibility(false)
+        } else {
+            this.playerTools.setVisibility(true)
+        }
         this.baseGUI.setVisibility(visible)
         this.toggleScreen()
     }
     
     public toggleRobotGUI(visible: boolean) {
         if(this.robotGUI.isVisible == visible) return
-        if (visible) this.baseGUI.setVisibility(false)
+        if (visible) {
+            this.baseGUI.setVisibility(false)
+            this.playerTools.setVisibility(false)
+        } else {
+            this.playerTools.setVisibility(true)
+        }
         this.robotGUI.setVisibility(visible)
         this.toggleScreen()
     }

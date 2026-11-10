@@ -1,11 +1,13 @@
 import MainScene from "../CodeLuna";
-import { TEXT_SPACING } from "./constants";
+import { TEXT_SPACING, TOOLBOX_SPACING, TOOLBOX_WIDTH } from "./constants";
 import Logic from "./logic";
-import UIStatLine, { UIIconStatLine, UIStatButtonLine, UITextButtonLine, UITextLine } from "./StatMessage";
+import { PlayerState } from "./Player";
+import UIStatLine, { UIIconButton, UIIconStatLine, UIStatButtonLine, UITextButtonLine, UITextLine } from "./StatMessage";
 
-export default class UITextColumn {
+export default class UIColumn {
     private scene: MainScene
     public list: UITextLine[] = []
+    public iconButtons: UIIconButton[] = []
     public readonly x: number
     public readonly y: number
     public latestY: number
@@ -17,11 +19,11 @@ export default class UITextColumn {
         scene: MainScene, 
         x:number = TEXT_SPACING, 
         y:number = TEXT_SPACING,
-        startVisible: boolean,
+        startVisible: boolean = true,
+        align: string = "left",
         width: number = 0,
         height: number = 0,
         backgroundColor: number | null = null,
-        align: string = "left"
     ) {
         this.scene = scene
         this.x = x
@@ -109,8 +111,30 @@ export default class UITextColumn {
         }
     }
 
-    public getAsGameObjects(): (Phaser.GameObjects.Text | Phaser.GameObjects.Image)[] {
-        return this.list.flatMap(line => line.getObjects())
+    public addIconButton(iconName: string, fun: () => boolean) {
+        this.iconButtons.push(
+            new UIIconButton(
+                this.scene, 
+                this.x, 
+                this.latestY, 
+                iconName, 
+                fun,
+                () => { 
+                    this.scene.player.playerState = PlayerState.holdingNothing
+                    for(const button of this.iconButtons) {
+                        button.deselect()
+                    }
+                })
+        )
+        this.latestY += TOOLBOX_WIDTH + TOOLBOX_SPACING
+        return this
+    }
+
+    public getAsGameObjects(): (Phaser.GameObjects.Text | Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle)[] {
+        return [
+            ...this.list.flatMap(line => line.getObjects()),
+            ...this.iconButtons.flatMap(button => button.getObjects())
+        ]
     }
 
     public setVisibility(isVisible: boolean) {

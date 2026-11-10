@@ -6,7 +6,9 @@ export const PART_DRILL_NAME = 'part-drill'
 export const PART_GUN_NAME = 'part-gun'
 export const PART_CPU_NAME = 'part-cpu'
 export const BLOCK_WHEEL_NAME = 'block-wheel'
+export const FACTORY_BLOCK = "block-factory"
 export const WHEEL_CHASSIS_NAME = 'wheel-chassis'
+export const WELDER_PART = 'part-welder'
 
 export const BASIC_ASSET_NAMES = [
     'block-aluminum','block-steel', 'block-factory', 'block-sleek', 'block-tread', 'block-storage', 'block-frame','null',
@@ -18,7 +20,7 @@ export const BASIC_ASSET_NAMES = [
 ]
 
 export const TWO_FRAME_ASSETS = [
-    'player/down','player/up','player/right','player/left', PART_DRILL_NAME, BLOCK_WHEEL_NAME
+    'player/down','player/up','player/right','player/left', PART_DRILL_NAME, BLOCK_WHEEL_NAME, WELDER_PART
 ]
 export const DIRECTION_OFFSETS: XY[] = [xy(0,1),xy(0,-1),xy(1,0),xy(-1,0)]
 
@@ -39,8 +41,8 @@ export const GUI_TEXT_START = xy(
 export const BATTERY_SIZE = 10
 export const BLOCK_RES = 16
 export const TEXT_SPACING = 20
-export const TOOLBOX_WIDTH = 20
-export const TOOLBOX_SPACING = 4
+export const TOOLBOX_WIDTH = 40
+export const TOOLBOX_SPACING = 8
 export const BASE_POS = xy(300,300)
 export const GAME_SPEED = 8000
 

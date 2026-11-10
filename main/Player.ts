@@ -14,6 +14,26 @@ export default class Player extends HPImage {
             .setDrag(700)
             .setDepth(BLOCK_DEPTH)
     }
+
+    toggleHoldingGun() {
+        return this.togglePlayerState(PlayerState.holdingGun)
+    }
+    toggleHoldingWelder() {
+        return this.togglePlayerState(PlayerState.holdingWelder)
+    }
+    toggleHoldingFactoryBlock() {
+        return this.togglePlayerState(PlayerState.holdingFactoryBlock)
+    }
+
+    togglePlayerState(newState: PlayerState) {
+        if (this.playerState == newState) {
+            this.playerState = PlayerState.holdingNothing
+            return false
+        } else {
+            this.scene.player.playerState = newState
+            return true
+        }
+    }
 }
 
 export enum PlayerState {

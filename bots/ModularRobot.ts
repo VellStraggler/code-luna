@@ -61,6 +61,7 @@ export default class ModularRobot implements IGameFighter{
     canMove = false; canCreate = false;
     guns = 0; canSend = false; canReceive = false;
 
+    /* use create(...) or createFromBlock(...) instead **/
     private constructor(scene: MainScene, sourceBlock: ModularBlock) {
         this.scene = scene
         this.id = generateId();
@@ -92,8 +93,8 @@ export default class ModularRobot implements IGameFighter{
         this.hp = 0
         this.scene.robots.robots = this.scene.robots.robots.filter(robot => robot !== this)
         this.proxyGlobalBlock = null
-        this.sourceBlock.image.destroy()
         this.sourceBlock.modularParts.forEach(part => part.image.destroy())
+        this.sourceBlock.destroy()
     }
 
     /** Hitting a robot block immediately converts the block into a separate robot */
@@ -302,6 +303,7 @@ export default class ModularRobot implements IGameFighter{
         this.allHitboxes.push(block.image)
         this.addToObjectCounts(block.itemName)
         this.registerBlock(block)
+        this.scene.uiCamera.ignore(block.image)
 
         //add to totals
         for (const part of block.modularParts) {
@@ -448,11 +450,11 @@ export default class ModularRobot implements IGameFighter{
                 this.storedCosmorite += amt * GAS_MINE_RATE
                 this.storedLunestone += amt * STONE_MINE_RATE
                 this.isMiningThis?.takeDamage(amt)
+                if (!this.scene.sound.isPlaying("drilling")) {
+                    this.scene.sound.play("drilling")
+                }
             } else {
                 this.stopDrilling()
-            }
-            if (!this.scene.sound.isPlaying("drilling")) {
-                this.scene.sound.play("drilling")
             }
         } else {
             this.stopDrilling()

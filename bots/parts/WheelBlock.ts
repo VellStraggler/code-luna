@@ -3,13 +3,14 @@ import { BLOCK_DEPTH, BLOCK_RES, Dirs, ENERGY_MS_PER_WHEEL, WHEEL_CHASSIS_NAME }
 import Logic from "../../main/logic";
 import { xy, XY } from "../../main/xy";
 import ModularRobot from "../ModularRobot";
+import ModularRobots from "../ModularRobots";
 import { BlockType } from "./BlockType";
 import ModularBlock from "./ModularBlock";
 import * as Phaser from 'phaser'
 
 export default class WheelBlock extends ModularBlock {
     chassisImage: Phaser.Physics.Arcade.Image | null
-    robot: ModularRobot
+    robot: ModularRobot | null
 
     constructor(scene: MainScene, position: XY, robot: ModularRobot, parentBlock: ModularBlock | null = null) {
         super(
@@ -34,6 +35,13 @@ export default class WheelBlock extends ModularBlock {
         .setDepth(BLOCK_DEPTH + 50)
         this.scene.baseLayer.push(this.chassisImage)
         this.rotateChassis(dir)
+    }
+
+    public override disconnect(scene: MainScene, robots: ModularRobots) {
+        this.chassisImage?.destroy()
+        this.chassisImage = null
+        this.robot = null
+        super.disconnect(scene, robots)
     }
     
     public override rotateChassis(dir: Dirs): void {
@@ -65,7 +73,9 @@ export default class WheelBlock extends ModularBlock {
         let newy = this.globalPos.y + this.localPos.y
         this.chassisImage?.setPosition(newx, newy)
 
-        this.image.setRotation(this.robot.movingDirectionRadians)
+        if (this.robot != null) {
+            this.image.setRotation(this.robot.movingDirectionRadians)
+        }
 
     }
 

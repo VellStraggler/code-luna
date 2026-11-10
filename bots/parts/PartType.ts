@@ -1,4 +1,4 @@
-import { BLOCK_RES, ENERGY_USE_MULT, PART_DRILL_NAME } from "../../main/constants";
+import { BLOCK_RES, ENERGY_USE_MULT, PART_DRILL_NAME, WELDER_PART } from "../../main/constants";
 import IGameItemType from "../contracts/IGameItemType"
 import { XY, xy } from "../../main/xy";
 
@@ -27,6 +27,7 @@ export class PartType implements IGameItemType{
     static partBattery =     new PartType('part-battery',           1,   6,   1,   1,  0  * ENERGY_USE_MULT)
     static partCamera =      new PartType('part-camera',            0.4, 3,   1,   2,  1  * ENERGY_USE_MULT)
     static partGun =         new PartType('part-gun',               0.5, 3,   1,   2,  0 * ENERGY_USE_MULT) //active only when firing
+    static partWelder =      new PartType(WELDER_PART,              0.5, 3,   1,   2,  0 * ENERGY_USE_MULT) //active only when firing
     static partQR =          new PartType('part-qr',                0,   0.1, 1,   3,  0  * ENERGY_USE_MULT)
     static partSolar =       new PartType('part-solar-panel',       1,   5,   2,   3,  -1 * ENERGY_USE_MULT)
     static partNull =        new PartType('part-null',              0,   0,   0,   1,  0)
@@ -40,6 +41,7 @@ export class PartType implements IGameItemType{
         this.dict['part-battery'] = PartType.partBattery
         this.dict['part-camera'] = PartType.partCamera
         this.dict['part-gun'] = PartType.partGun
+        this.dict[WELDER_PART] = PartType.partWelder
         this.dict['part-qr'] = PartType.partQR
     }
 

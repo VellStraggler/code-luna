@@ -5,12 +5,15 @@ import MainStats from "./main/MainStats"
 import Player, { PlayerState } from "./main/Player"
 import GUI from "./main/gui"
 import HPImage from './main/HPImage'
-import { BASIC_ASSET_NAMES, WINDOW, BLOCK_RES, LASER_TEST_MS, FRAME_TIME_MS, BASE_POS, GAME_SPEED, REFINEMENT_RATE_MS, MINING_RATE_MS, COSMORITE_ORE, TWO_FRAME_ASSETS, F1, F0, BLOCK_DEPTH } from './main/constants'
+import { BASIC_ASSET_NAMES, WINDOW, BLOCK_RES, LASER_TEST_MS, FRAME_TIME_MS, BASE_POS, GAME_SPEED, REFINEMENT_RATE_MS, MINING_RATE_MS, COSMORITE_ORE, TWO_FRAME_ASSETS, F1, F0, BLOCK_DEPTH, FACTORY_BLOCK } from './main/constants'
 import IGameFighter from './bots/contracts/IGameFighter'
-import { XY, xy } from './main/xy'
+import pos, { XY, xy } from './main/xy'
 import LaserShot from './bots/LaserShot'
 import Controls from './main/Controls'
 import ModularRobots from './bots/ModularRobots'
+import Logic from './main/logic'
+import ModularRobot from './bots/ModularRobot'
+import { BlockType } from './bots/parts/BlockType'
 
 export default class MainScene extends Phaser.Scene {
     public player!: Player
@@ -61,6 +64,8 @@ export default class MainScene extends Phaser.Scene {
     }
 
     create() {
+
+        this.input.setTopOnly(true)
         /// CAMERA ///
         const camera = this.cameras.main
         camera.setZoom(2)
@@ -101,16 +106,12 @@ export default class MainScene extends Phaser.Scene {
 
         /// Player Firing Laser
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-            if(
-                this.GUI.baseGUI.isVisible || 
-                this.player.playerState != PlayerState.holdingGun
-            ) return
-            this.shootAtMousePosition(this.player, pointer)
+            this.controls.onNonButtonClick(pointer)
         })
         
         this.createOre(500, 300)
         
-        this.controls = new Controls(this)
+        this.controls = new Controls(this, this.player)
         this.input.addListener("focus", () => {
             console.log("FOCUS")
             this.typing = true
@@ -157,40 +158,6 @@ export default class MainScene extends Phaser.Scene {
             this.base.isOverlapped = true
         })
     }
-
-    
-
-    updateMovement(distance: number) {
-        if (this.typing) {
-            return
-        }
-
-        let goX = 0
-        let goY = 0
-        if (this.controls.leftPressed()) {
-            goX -= 1
-            this.player.setAnimatedTexture("player/left", this.animateScene)
-        }
-        else if (this.controls.rightPressed()) {
-            goX += 1
-            this.player.setAnimatedTexture("player/right", this.animateScene)
-        }
-        else if (this.controls.upPressed()) {
-            goY -= 1
-            this.player.setAnimatedTexture("player/up", this.animateScene)
-        }
-        else if (this.controls.downPressed()) {
-            goY += 1
-            this.player.setAnimatedTexture("player/down", this.animateScene)
-        }
-
-        // diagonal movement
-        if (goX!=0 && goY!=0) {
-            goX *= .74
-            goY *= .74
-        }
-        this.player.setVelocity(goX * distance, goY * distance)
-    }
     
     update(_time: number, delta: number) {
         const distance = GAME_SPEED * (delta / 1000)
@@ -205,7 +172,7 @@ export default class MainScene extends Phaser.Scene {
             this.prevFrameTime = _time
         }
         
-        this.updateMovement(distance)
+        this.controls.updateMovement(distance)
 
         if (this.controls.spaceJustDown()) {
             this.debug_shootAllLasers()
@@ -284,17 +251,21 @@ export default class MainScene extends Phaser.Scene {
         }
     }
 
-    public summonBlock() {
+    public async weldAtMousePosition(fromObj: HPImage, position: Phaser.Input.Pointer) {
+        // find 2 nearest blocks
+        // ensure they are both close enough to position
+        // connect them
+        console.log("not implemented: welding")
+    }
+
+    public debug_summonBlock(fromObj: HPImage, position: Phaser.Input.Pointer) {
+        if (Logic.getDist(fromObj.getPosition(), xy(position.worldX, position.worldX)) > BLOCK_RES * 5) return
         if (this.mainStats.getLunestone() >= 1) {
             this.mainStats.incLunestone(-1)
-            let roundx = Math.round(this.player.x/BLOCK_RES) * BLOCK_RES
-            let roundy = Math.round(this.player.y/BLOCK_RES) * BLOCK_RES
-            let newblock: Phaser.Physics.Arcade.Image = this.physics.add.image(roundx, roundy, "block-aluminum")
-            newblock.setDrag(1000)
-            this.baseLayer.push(newblock)
-            this.uiCamera.ignore(newblock)
-            this.physics.add.collider(this.player, newblock)
-            this.blocks.push(newblock)
+            let roundx = Math.round(position.worldX/BLOCK_RES) * BLOCK_RES
+            let roundy = Math.round(position.worldY/BLOCK_RES) * BLOCK_RES
+            this.robots.push(ModularRobot.create(this, BlockType.factory, roundx, roundy)
+                .addEnemyCollider(this.player))
         }
     }
     public debug_summonRobot() {

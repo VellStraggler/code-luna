@@ -1,6 +1,7 @@
 import MainScene from "../CodeLuna"
-import { GUI_DEPTH, TEXT_SPACING } from "./constants"
+import { GUI_DEPTH, TEXT_SPACING, TOOLBOX_WIDTH } from "./constants"
 import Logic from "./logic"
+import MyColors from "./MyColors"
 import { XY, xy } from "./xy"
 
 export class UITextLine {
@@ -39,6 +40,42 @@ export class UITextLine {
     }
 }
 
+/** non-standard alignment doesn't really work on this one... These will be centered on the given x-value*/
+export class UIIconButton {
+    selected: boolean = false
+    private bg: Phaser.GameObjects.Rectangle
+    private icon: Phaser.GameObjects.Image
+
+    constructor(scene: MainScene, x: number, y: number, iconName: string = "null", onClick: () => any, deselectAll: () => any) {
+        this.bg = scene.add.rectangle(x, y, TOOLBOX_WIDTH, TOOLBOX_WIDTH, MyColors.white)
+            .setStrokeStyle(0, MyColors.black)
+            .setInteractive()
+            .on('pointerdown', () => {
+                if (this.selected) {
+                    deselectAll()
+                } else {
+                    deselectAll()
+                    onClick()
+                    this.select()
+                }
+            })
+            
+        this.icon = scene.add.image(this.bg.x, this.bg.y, iconName)
+            .setScale(2)
+    }
+
+    deselect() {
+        this.selected = false
+        this.bg.setStrokeStyle(0)
+    }
+    select() {
+        this.selected = true
+        this.bg.setStrokeStyle(2)
+    }
+    public getObjects(): (Phaser.GameObjects.Rectangle | Phaser.GameObjects.Image)[] {
+        return [this.bg, this.icon]
+    }
+}
 
 export default class UIStatLine extends UITextLine {
 

@@ -82,6 +82,13 @@ export default class HPImage extends Phaser.Physics.Arcade.Image implements IGam
         return this
     }
 
+    override destroy() {
+        this.hpBar.destroy()
+        this.hpBarBG.destroy()
+        this.shadow?.destroy()
+        super.destroy()
+    }
+
     
     canShoot(): boolean { return this.scene.mainStats.getGas() - LASER_ENERGY_USE > 0 }
     shootLaser(): number {

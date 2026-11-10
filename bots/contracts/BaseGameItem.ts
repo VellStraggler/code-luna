@@ -47,6 +47,9 @@ export default class BaseGameItem implements IGameItem {
     public getEnergyUse() {
         return 0
     }
+    public destroy() {
+        this.image.destroy()
+    }
 
     rotate(amount:number = 0) {
         this.image.setRotation(amount)
