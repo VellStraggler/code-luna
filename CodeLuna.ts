@@ -252,10 +252,35 @@ export default class MainScene extends Phaser.Scene {
     }
 
     public async weldAtMousePosition(fromObj: HPImage, position: Phaser.Input.Pointer) {
-        // find 2 nearest blocks
         // ensure they are both close enough to position
+        if (Phaser.Math.Distance.Between(fromObj.x, fromObj.y, position.worldX, position.worldY) > BLOCK_RES * 5) return
+        
+        // find 2 nearest blocks
+        let nearestBlocks: ModularBlock[] = []
+        let nearestDists: number[] = []
+        for (const robot of this.robots) {
+            for (const block of robot.allBlocks) {
+                let dist = Logic.getDist(block.image.getPosition(), xy(position.worldX, position.worldY))
+                if (dist < BLOCK_RES * 2) {
+                    if (nearestBlocks.length == 0) {
+                        nearestBlocks.push(block)
+                        nearestDists.push(dist)
+                    } else {
+                        if (dist < nearestDists[nearestDists.length-1]) {
+                            nearestBlocks.push(block)
+                            nearestDists.push(dist)
+                        }
+                    }
+                }
+            }
+        }
         // connect them
-        console.log("not implemented: welding")
+        if (nearestBlocks.length >= 2) {
+            let blockA = nearestBlocks[nearestBlocks.length - 1]
+            let blockB = nearestBlocks[nearestBlocks.length - 2]
+
+            blockA.connectBlock(blockB)
+        }
     }
 
     public debug_summonBlock(fromObj: HPImage, position: Phaser.Input.Pointer) {
