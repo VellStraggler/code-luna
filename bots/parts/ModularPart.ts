@@ -54,8 +54,8 @@ export class ModularPart extends BaseGameItem {
     }
 
     override update(animateFrame: boolean = true) {
-        let x = this.parentBlock.globalPos.x + this.parentBlock.localPos.x + this.localPos.x + this.partType.offset.x
-        let y = this.parentBlock.globalPos.y + this.parentBlock.localPos.y + this.localPos.y + this.partType.offset.y
+        let x = this.parentBlock.globalPos.x + this.localPos.x + this.partType.offset.x
+        let y = this.parentBlock.globalPos.y + this.localPos.y + this.partType.offset.y
 
         this.image.setPosition(x,y)
         // match velocity

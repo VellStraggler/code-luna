@@ -1,4 +1,5 @@
 import { Dirs } from "./constants";
+import HPImage from "./HPImage";
 import { xy, XY } from "./xy";
 import * as Phaser from 'phaser'
 
@@ -8,6 +9,10 @@ export default class Logic {
         return Phaser.Math.Distance.Between(
             xy1.x, xy1.y, xy2.x, xy2.y
         )
+    }
+
+    public static getDistFromClick(fromObj: HPImage, position: Phaser.Input.Pointer) {
+        return Phaser.Math.Distance.Between(fromObj.getPosition().x, fromObj.getPosition().y, position.worldX, position.worldY)
     }
 
     public static getDir(xy1: XY, xy2: XY): Dirs {

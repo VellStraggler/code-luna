@@ -14,6 +14,7 @@ import ModularRobots from './bots/ModularRobots'
 import Logic from './main/logic'
 import ModularRobot from './bots/ModularRobot'
 import { BlockType } from './bots/parts/BlockType'
+import ModularBlock from './bots/parts/ModularBlock'
 
 export default class MainScene extends Phaser.Scene {
     public player!: Player
@@ -21,19 +22,18 @@ export default class MainScene extends Phaser.Scene {
     public robots!: ModularRobots
     public lasers: LaserShot[] = []
     public base!: HPImage
-    private cosmoriteOre!: HPImage
-    private blocks: Phaser.Physics.Arcade.Image[] = []
+    public cosmoriteOre!: HPImage
     public mainStats!: MainStats
     public GUI!: GUI
     public uiCamera!: Phaser.Cameras.Scene2D.Camera
     public baseLayer: (Phaser.Physics.Arcade.Image | Phaser.GameObjects.Image)[] = []
+
     private controls!: Controls
     public typing = false
+
     public animateScene = false
     public prevFrameTime: number = 0
-
     private prevShotTime: number = 0
-    keynput = document.getElementById("test-input")
 
     laserSound!: HTMLAudioElement
     painSound!: HTMLAudioElement
@@ -58,9 +58,9 @@ export default class MainScene extends Phaser.Scene {
         this.load.audio("laser", audioPre + "laser.mp3")
         this.load.audio("pain", audioPre + "pain.mp3")
         this.load.audio("drilling", audioPre + "drilling.wav", {loop: true, volume: 0.5})
+        this.load.audio("weld", audioPre + "weld.mp3")
         this.laserSound = new Audio(prefix + "audio/laser.wav")
         this.painSound = new Audio(prefix + "audio/pain.mp3")
-        this.drillSound = new Audio(prefix + "audio/drilling.mp3")
     }
 
     create() {
@@ -102,7 +102,7 @@ export default class MainScene extends Phaser.Scene {
         this.createBase(BASE_POS.x, BASE_POS.y)
 
         this.robots = new ModularRobots(this)
-        this.robots.createRobot()
+        this.robots.debug_createRobot()
 
         /// Player Firing Laser
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
@@ -142,7 +142,7 @@ export default class MainScene extends Phaser.Scene {
         this.physics.add.collider(this.player, this.cosmoriteOre, () => {
             this.cosmoriteOre.isOverlapped = true;
         })
-        this.robots.get(0).allowMining(this.cosmoriteOre)
+        this.robots.get(0).notifyOfCosmorite()
     }
 
     createPlayer() {
@@ -253,13 +253,15 @@ export default class MainScene extends Phaser.Scene {
 
     public async weldAtMousePosition(fromObj: HPImage, position: Phaser.Input.Pointer) {
         // ensure they are both close enough to position
-        if (Phaser.Math.Distance.Between(fromObj.x, fromObj.y, position.worldX, position.worldY) > BLOCK_RES * 5) return
-        
+        console.log(fromObj.getPosition() + " as player, clicked at: " + position.worldX + ", " + position.worldY)
+        let dist = Logic.getDistFromClick(fromObj, position)
+        if (dist > BLOCK_RES * 6) return
+        console.log(dist)
         // find 2 nearest blocks
         let nearestBlocks: ModularBlock[] = []
         let nearestDists: number[] = []
         for (const robot of this.robots) {
-            for (const block of robot.allBlocks) {
+            for (const block of robot.blocks) {
                 let dist = Logic.getDist(block.image.getPosition(), xy(position.worldX, position.worldY))
                 if (dist < BLOCK_RES * 2) {
                     if (nearestBlocks.length == 0) {
@@ -279,24 +281,26 @@ export default class MainScene extends Phaser.Scene {
             let blockA = nearestBlocks[nearestBlocks.length - 1]
             let blockB = nearestBlocks[nearestBlocks.length - 2]
 
-            blockA.connectBlock(blockB)
+            blockA.connectBlock(blockB, "right")
+            this.sound.play("weld")
         }
     }
 
     public debug_summonBlock(fromObj: HPImage, position: Phaser.Input.Pointer) {
-        if (Logic.getDist(fromObj.getPosition(), xy(position.worldX, position.worldX)) > BLOCK_RES * 5) return
+        let dist = Logic.getDistFromClick(fromObj, position)
+        if (dist > BLOCK_RES * 6) return
         if (this.mainStats.getLunestone() >= 1) {
             this.mainStats.incLunestone(-1)
             let roundx = Math.round(position.worldX/BLOCK_RES) * BLOCK_RES
             let roundy = Math.round(position.worldY/BLOCK_RES) * BLOCK_RES
-            this.robots.push(ModularRobot.create(this, BlockType.factory, roundx, roundy)
+            this.robots.push(ModularRobot.create(this, roundx, roundy)
                 .addEnemyCollider(this.player))
         }
     }
     public debug_summonRobot() {
         let newRobot = this.robots.get(0).deepCopy(200,200)
         newRobot.addEnemyCollider(this.player)
-        newRobot.allowMining(this.cosmoriteOre)
+        newRobot.notifyOfCosmorite()
         this.robots.push(newRobot)
         this.uiCamera.ignore(this.baseLayer)
     }

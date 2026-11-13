@@ -169,7 +169,7 @@ export default class GUI {
 
     private initCpuGUI() {
         this.robotGUI = new UIColumn(this.scene, GUI_TEXT_START.x, GUI_TEXT_START.y, false)
-            .addStatLine("blocks: ", () => this.robotOfCPU?.allBlocks.length)
+            .addStatLine("blocks: ", () => this.robotOfCPU?.blocks.length)
             .addStatLine("stored lunestone: ", () => this.robotOfCPU?.storedLunestone)
             .addStatLine("stored cosmorite: ", () => this.robotOfCPU?.storedCosmorite)
             .addStatLine("storage limit: ", () => this.robotOfCPU?.storageSpace)

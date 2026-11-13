@@ -9,8 +9,7 @@ import MainScene from "../CodeLuna";
 import IGameFighter from "./contracts/IGameFighter";
 import * as Phaser from 'phaser'
 import CpuPart from "./parts/CpuPart";
-import BlockBuilder, { PartBuilder } from "./parts/builderClasses";
-import Logic from "../main/logic";
+import BlockBuilder from "./parts/builderClasses";
 import WheelBlock from "./parts/WheelBlock";
 
 /**
@@ -18,13 +17,13 @@ import WheelBlock from "./parts/WheelBlock";
  * sum vars like total weight, and available modular parts
  */
 export default class ModularRobot implements IGameFighter{
-    scene!: MainScene
+    scene: MainScene
     readonly id: number;
-    public sourceBlock: ModularBlock;
+    public position: XY
+    public velocity: Phaser.Math.Vector2
     public proxyGlobalBlock: ModularBlock | null = null
-    public allBlocks: ModularBlock[] = []
-    private allHitboxes: Phaser.Physics.Arcade.Image[] = []
-    public allModularParts: ModularPart[] = []
+    public blocks: ModularBlock[] = []
+    public parts: ModularPart[] = []
     public movingDirectionRadians = 0
 
     public latestCpuPart: CpuPart | null = null
@@ -62,26 +61,28 @@ export default class ModularRobot implements IGameFighter{
     guns = 0; canSend = false; canReceive = false;
 
     /* use create(...) or createFromBlock(...) instead **/
-    private constructor(scene: MainScene, sourceBlock: ModularBlock) {
+    private constructor(scene: MainScene, position: XY, startingBlockType: BlockType = BlockType.sleek) {
         this.scene = scene
         this.id = generateId();
-        this.sourceBlock = sourceBlock;
-
-        // use childIds to track all visited nodes (blocks)
-        this.reload()
+        this.position = position
+        this.velocity = new Phaser.Math.Vector2(0,0)
+        this.addBlock(BlockBuilder.new(scene, xy(), startingBlockType, this))
+            .addEnemyCollider(scene.player)
     }
 
-    static create(scene: MainScene, sourceBlockType: BlockType, x: number, y: number) {
-        return new this(scene, new ModularBlock(scene, xy(x,y), sourceBlockType))
+    static create(scene: MainScene, x: number, y: number, blocktype: BlockType = BlockType.sleek) {
+        let newRobot = new this(scene, xy(x,y), blocktype)
+        return newRobot
     }
 
     static createFromBlock(scene: MainScene, sourceBlock: ModularBlock) {
-        return new this(scene, sourceBlock)
+        let newRobot = new this(scene, sourceBlock.globalPos, sourceBlock.blockType)
+        return newRobot
     }
     
     /** Position is based on the source block */
     getPosition() {
-        return this.sourceBlock.globalPos;
+        return this.position;
     }
 
     equals(other:ModularRobot) {
@@ -89,12 +90,11 @@ export default class ModularRobot implements IGameFighter{
     }
 
     /** drop resources and remove self from robot list */
-    die() {
-        this.hp = 0
+    destroy() {
+        for(const block of this.blocks) {
+            block.destroy()
+        }
         this.scene.robots.robots = this.scene.robots.robots.filter(robot => robot !== this)
-        this.proxyGlobalBlock = null
-        this.sourceBlock.modularParts.forEach(part => part.image.destroy())
-        this.sourceBlock.destroy()
     }
 
     /** Hitting a robot block immediately converts the block into a separate robot */
@@ -103,8 +103,8 @@ export default class ModularRobot implements IGameFighter{
             const block: ModularBlock = target as ModularBlock
             block.hp-= amt
             if(block.hp <= 0) {
-                if (this.allBlocks.length == 1) {
-                    this.die()
+                if (this.blocks.length == 1) {
+                    this.destroy()
                 } else {
                     block.disconnect(this.scene, this.scene.robots, this)
                     block.resetHP()
@@ -117,11 +117,14 @@ export default class ModularRobot implements IGameFighter{
     getHP(): number {
         return this.hp
     }
-    getHitboxes(): Phaser.Physics.Arcade.Image[] {
-        return this.allHitboxes
+
+    remove(block: ModularBlock) {
+        this.blocks = this.blocks.filter(b => !b.equals(block))
+        return block
     }
 
     private resetAbilities() {
+        this.objectCounts = {}
         this.weight = 0
         this.storageSpace = 0
         this.gasCost = 0
@@ -211,16 +214,6 @@ export default class ModularRobot implements IGameFighter{
         this.calculateSpeed()
         this.propagateResistance()
     }
-    public countAllBlocks(parentBlock: ModularBlock | null = null) {
-        if (parentBlock == null) {
-            this.allBlocks = [this.sourceBlock]
-        } else {
-            this.sourceBlock.childBlocks.forEach(child => {
-                this.allBlocks.push(child)
-                // this.countAllBlocks(child)
-            })
-        }
-    }
 
     private calculateSpeed() {
         this.maxSpeed = Math.max(0, (this.wheelCount * 120)/this.weight)
@@ -231,8 +224,8 @@ export default class ModularRobot implements IGameFighter{
         }
     }
     private propagateResistance() {
-        if (this.maxSpeed == 0 && this.allBlocks.length != 1){
-            this.allBlocks.forEach(block => {
+        if (this.maxSpeed == 0 && this.blocks.length != 1){
+            this.blocks.forEach(block => {
                 block.image.setImmovable(true)
             });
         } 
@@ -240,10 +233,10 @@ export default class ModularRobot implements IGameFighter{
             let massMult = 10
             const finalMass = Math.max(1, 
                 (this.weight - this.maxSpeed))
-            if(this.maxSpeed == 0 && this.allBlocks.length == 1 ) {
+            if(this.maxSpeed == 0 && this.blocks.length == 1 ) {
                 massMult *= 3 
             }
-            for(const block of this.allBlocks) {
+            for(const block of this.blocks) {
                 block.image.setImmovable(false)
                 block.image.setMass(finalMass * massMult)
                 block.image.setFriction(1,0)
@@ -271,16 +264,9 @@ export default class ModularRobot implements IGameFighter{
         return best;
     }
 
-    addChildBlock(offset: XY, block:ModularBlock) {
-        block.localPos = offset
-        block.parentBlock = this.sourceBlock
-        this.sourceBlock.childBlocks.push(block)
-        this.reload()
-    }
-
     public getCpuPart(): CpuPart | null {
         if (this.latestCpuPart == null) {
-            for (const part of this.allModularParts) {
+            for (const part of this.parts) {
                 if (part.partType.assetName == PART_CPU_NAME) {
                     this.latestCpuPart = part as CpuPart
                 }
@@ -298,39 +284,44 @@ export default class ModularRobot implements IGameFighter{
 
     /** Recurses through blocks, gathering data as we go.
      * Collects all childIds and all blocks for allBlocks and objectCounts*/
-    private visitNodes(block: ModularBlock) {
-        this.allBlocks.push(block)
-        this.allHitboxes.push(block.image)
-        this.addToObjectCounts(block.itemName)
-        this.registerBlock(block)
-        this.scene.uiCamera.ignore(block.image)
+    private recordBlockData() {
+        for (const block of this.blocks) {
+            this.addToObjectCounts(block.itemName)
+            this.registerBlock(block)
+            this.scene.uiCamera.ignore(block.image)
 
-        //add to totals
-        for (const part of block.modularParts) {
-            this.allModularParts.push(part)
-            this.registerPart(part)
-            this.addToObjectCounts(part.itemName)
+            //add to totals
+            for (const part of block.modularParts) {
+                this.registerPart(part)
+                this.addToObjectCounts(part.itemName)
+            }
+            
+            // getting chassis rotation:
+            // for (const block of this.allBlocks) {
+            //     const dir = Logic.getDir(block.localPos, childBlock.localPos)
+            //     childBlock.rotateChassis(dir)
+            // }
         }
-        
-        for (const childBlock of block.childBlocks) { 
-            const dir = Logic.getDir(block.localPos, childBlock.localPos)
-            childBlock.rotateChassis(dir)
-            this.visitNodes(childBlock)
-        }
-        // if it has no childblocks, we have reached one of many
-        // potential endpoints
     }
 
     registerPart(part: ModularPart) {
         switch (part.itemName) {
             case PART_DRILL_NAME:
-                this.latestDrillPart = part
+                this.allowMining(this.scene.cosmoriteOre, part)
                 break
             case PART_CPU_NAME:
                 this.latestCpuPart = part as CpuPart
                 break
+            case PART_GUN_NAME:
+                this.latestGunPart = part
             default:
                 break
+        }
+    }
+
+    notifyOfCosmorite() {
+        if (this.latestDrillPart != null) {
+            this.allowMining(this.scene.cosmoriteOre, this.latestDrillPart)
         }
     }
 
@@ -344,33 +335,36 @@ export default class ModularRobot implements IGameFighter{
         }
     }
 
-    emptyAllLists() {
-        this.allBlocks = []
-        this.allModularParts = []
-        this.allHitboxes = []
-        this.objectCounts = {}
-    }
-
-    /** Clears out: blocks, hitboxes, objectCounts.
+    /** Clears out: blocks, objectCounts.
      *  Re-traverses for them and evaluates the robot's abilities */
     public reload(): ModularRobot {
-        this.emptyAllLists()
         this.resetAbilities()
-        this.visitNodes(this.sourceBlock)
+        this.recordBlockData()
         this.evaluateAbilities()
         return this
     }
 
     public update(delta: number) {
         if(this.proxyGlobalBlock != null) {
-            if(this.proxyGlobalBlock.image.body == undefined) return //this guy is in fact dead
+            if(this.proxyGlobalBlock.image.body == undefined) return // this guy is in fact dead
             if (this.hp <= 0) return
         }
+        let proxy = this.proxyGlobalBlock
 
-        if (this.proxyGlobalBlock !== null) {
-            if (this.proxyGlobalBlock.image.body !== null && this.proxyGlobalBlock.image.body !== undefined) {
-                this.sourceBlock.image.setVelocity(this.proxyGlobalBlock.image.body.velocity.x,
-                    this.proxyGlobalBlock.image.body.velocity.y)
+        if (proxy?.image.body) {
+            proxy.globalPos = xy(proxy.image.x, proxy.image.y)
+            this.position = proxy.globalPos.subtract(proxy.localPos)
+
+            for (const block of this.blocks) {
+                block.globalPos = this.position.add(block.localPos)
+
+                if (block !== proxy) {
+                    block.image.setPosition(block.globalPos.x, block.globalPos.y)
+                    block.image.setVelocity(
+                        proxy.image.body.velocity.x,
+                        proxy.image.body.velocity.y
+                    )
+                }
             }
         }
         let animateBlock = this.scene.animateScene
@@ -393,7 +387,7 @@ export default class ModularRobot implements IGameFighter{
 
             this.stepToPosition(this.goal)
             let reachedGoal = XY.distance(this.goal, this.getPosition()) < BLOCK_RES*2
-            if(!this.lastPos.equals(this.sourceBlock.image.getPosition())) {
+            if(!this.lastPos.equals(this.getPosition())) {
                 this.timeIdle = 0
             } else {
                 this.timeIdle += delta
@@ -404,12 +398,14 @@ export default class ModularRobot implements IGameFighter{
                 this.latestWheelBlock?.deactivate()
             }
         }
-        this.lastPos = xy(this.sourceBlock.image.x, this.sourceBlock.image.y)
+        this.lastPos = xy(this.position.x, this.position.y)
     }
 
-    updateMovingDirection(animateBlock: boolean) {
+    updateMovingDirection(animateNextFrame: boolean) {
         let oldPosition = xy(this.getPosition().x, this.getPosition().y)
-        this.sourceBlock.update(animateBlock)
+        for (const block of this.blocks) {
+            block.update(animateNextFrame)
+        }
         let newPosition = xy(this.getPosition().x, this.getPosition().y)
         if (oldPosition.x != newPosition.x || oldPosition.y != newPosition.y) {
             this.movingDirectionRadians = Phaser.Math.Angle.Between(oldPosition.x, oldPosition.y, newPosition.x, newPosition.y)
@@ -424,17 +420,19 @@ export default class ModularRobot implements IGameFighter{
         return this.latestDrillPart != null
     }
 
-    public getLastBlock(): ModularBlock {
-        return this.allBlocks[this.allBlocks.length-1]
+    public getLastBlock(): ModularBlock | null {
+        console.log(this.blocks.length)
+        if (this.blocks.length == 0) return null
+        return this.blocks[this.blocks.length-1]
     }
 
     public addPart(partType: PartType) {
-        this.getLastBlock().addPart(this.scene, partType, this)
+        this.getLastBlock()?.addPart(this.scene, partType, this)
         return this
     }
-    public addBlockType(blockType: BlockType, dir: string = 'down', index: number = -1) {
-        if (index == -1) index = this.allBlocks.length-1
-        this.addBlock(BlockBuilder.new(this.scene, xy(), blockType, this.allBlocks[index], this), dir, index)
+    public addBlockType(blockType: BlockType, x: number = 0, y: number = 0) {
+        const offset = xy(x*BLOCK_RES,y*BLOCK_RES)
+        this.addBlock(BlockBuilder.new(this.scene, offset, blockType, this))
         return this
     }
 
@@ -471,76 +469,49 @@ export default class ModularRobot implements IGameFighter{
     public deepCopy(newX: number | null = null, newY: number | null = null) {
         const pos = this.getPosition()
 
-        const robot = ModularRobot.create(
+        const newRobot = ModularRobot.create(
             this.scene,
-            this.sourceBlock.blockType,
             newX ?? pos.x,
             newY ?? pos.y
         )
 
-        this.copyParts(this.sourceBlock, robot.sourceBlock, robot)
-
+        for (const block of this.blocks) {
+            let newBlock = new ModularBlock(this.scene, pos.add(block.localPos), block.blockType, newRobot)
+            for (const part of block.modularParts) {
+                newBlock.addPart(this.scene, part.partType, newRobot)
+            }
+            newRobot.addBlock(newBlock)
+        }
         for (const other of this.scene.robots) {
-            this.scene.physics.add.collider(other.sourceBlock.image, robot.sourceBlock.image)
+            this.scene.physics.add.collider(other.blocks[0].image, newRobot.blocks[0].image)
         }
-
-        this.copyStep(this.sourceBlock, robot.sourceBlock, robot)
-
-        return robot.reload()
+        return newRobot
     }
 
-    private copyParts(oldBlock: ModularBlock, newBlock: ModularBlock, robot: ModularRobot) {
-        for (const part of oldBlock.modularParts) {
-            newBlock.modularParts.push(
-                PartBuilder.new(this.scene, part.itemName, newBlock, robot)
-            )
-        }
+    /** Takes the block's position and rounds it to our robot's block grid */
+    public addBlock(block:ModularBlock) {
+        let gridOffset = xy(this.position.x % BLOCK_RES, this.position.y % BLOCK_RES)
+        block.globalPos = block.globalPos.subtract(gridOffset)
+
+        this.blocks.push(block)
+        return this
     }
 
-    private copyStep(oldParent: ModularBlock, newParent: ModularBlock, robot: ModularRobot) {
-        for (const child of oldParent.childBlocks) {
-            const newChild = BlockBuilder.new(
-                this.scene,
-                child.localPos,
-                child.blockType,
-                newParent,
-                robot
-            )
-
-            this.copyParts(child, newChild, robot)
-            newParent.connectBlock(newChild)
-            this.copyStep(child, newChild, robot)
-        }
-    }
-
-    public addBlock(block:ModularBlock, dir:string, index: number = -1) {
-        if (index == -1) {
-            this.sourceBlock.connectBlock(block, dir)
-        } else {
-            this.allBlocks[index].connectBlock(block, dir)
-        }
-        this.reload()
-    }
-
-    public allowMining(cosmoriteOre: HPImage) {
-        this.scene.physics.add.overlap(this.getSourceImage(), cosmoriteOre, () => {
+    private allowMining(cosmoriteOre: HPImage, drillPart: ModularPart) {
+        this.latestDrillPart = drillPart
+        this.scene.physics.add.overlap(this.latestDrillPart.image, cosmoriteOre, () => {
             this.isMiningThis = cosmoriteOre
         })
     }
 
     public addCollider(scene: MainScene, offender: HPImage | Phaser.Physics.Arcade.Image) {
-        scene.physics.add.collider(offender, this.sourceBlock.image)
+        scene.physics.add.collider(offender, this.blocks[0].image)
     }
 
     public addEnemyCollider(offender: HPImage | Phaser.Physics.Arcade.Image) {
-        let newColliderGroup: ModularBlock[] = [this.sourceBlock]
-        this.sourceBlock.addEnemyCollider(this.scene, offender, newColliderGroup)
-        for(const obj of newColliderGroup) {
-            for(const obj2 of newColliderGroup) {
-                if(obj.id !== obj2.id) {
-                    this.scene.physics.add.collider(obj.image, obj2.image)
-                }
-            }
+        if (this.blocks.length == 0) return this
+        for (const block of this.blocks) {
+            block.addEnemyCollider(this.scene, offender)
         }
         return this
     }
@@ -551,20 +522,26 @@ export default class ModularRobot implements IGameFighter{
     }
     
     private stepToPosition(pos: XY) {
-        if (this.storedCosmorite != 0 &&
-            this.sourceBlock?.image?.body) {
+        if (this.storedCosmorite != 0) {
 
             this.latestWheelBlock?.activate()
-            this.scene.physics.moveTo(this.sourceBlock.image, pos.x, pos.y, this.maxSpeed)
+
+            let angle = Phaser.Math.Angle.Between(
+                this.position.x,
+                this.position.y,
+                pos.x,
+                pos.y
+            )
+
+            this.velocity = new Phaser.Math.Vector2(
+                Math.cos(angle) * this.maxSpeed,
+                Math.sin(angle) * this.maxSpeed
+            )
         } 
     }
 
     calcTimeLeft() {
         return this.storedCosmorite / (this.energyUsePerMs * 1000);
-    }
-
-    public getSourceImage() {
-        return this.sourceBlock.image
     }
 
     public getMeterRange() {
@@ -573,7 +550,7 @@ export default class ModularRobot implements IGameFighter{
 
     public aim(target: XY) {
         if (!this.hasCpu()) return
-        for (const part of this.allModularParts) {
+        for (const part of this.parts) {
             if(part.partType.assetName == PART_GUN_NAME) {
                 part.rotate(
                     Phaser.Math.Angle.Between(

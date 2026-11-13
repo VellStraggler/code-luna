@@ -29,7 +29,7 @@ export default class ModularRobots {
 
     getBySourceBlockId(id:number ): ModularRobot | null{
         this.robots.forEach(robot => {
-            if(robot.sourceBlock.id == id) {
+            if(robot.id == id) {
                 return robot
             }
         })
@@ -56,18 +56,17 @@ export default class ModularRobots {
         }
     }
 
-    createRobot(): ModularRobot {
-        let robot = ModularRobot.create(this.scene, BlockType.sleek, 400, 300)
+    debug_createRobot(): ModularRobot {
+        let robot = ModularRobot.create(this.scene, 400, 300, BlockType.sleek)
             .addPart(PartType.partDrill)
             .addPart(PartType.partGun)
-            .addBlockType(BlockType.sleek, 'left')
+            .addBlockType(BlockType.storage, 0, 1)
             .addPart(PartType.partCpu)
-            .addBlockType(BlockType.wheel, 'left')
-            .addBlockType(BlockType.storage, 'up', 1)
-            .addBlockType(BlockType.wheel, 'up')
-            .addBlockType(BlockType.wheel, 'up', 0)
-            .addBlockType(BlockType.wheel, 'right', 0)
-            .addBlockType(BlockType.wheel, 'down', 0)
+            .addBlockType(BlockType.wheel, 1, 0)
+            .addBlockType(BlockType.storage, 0, -1)
+            .addBlockType(BlockType.wheel, 0, -2)
+            .addBlockType(BlockType.wheel, 1, 1)
+            .addBlockType(BlockType.wheel, 0, 2)
             .addEnemyCollider(this.scene.player)
             .reload()
         this.robots.push(robot)
@@ -76,7 +75,8 @@ export default class ModularRobots {
     }
 
     allowOffloading(robot: ModularRobot) {
-        this.scene.physics.add.collider(this.scene.base, robot.getSourceImage(), () => {
+        if (robot.blocks.length == 0) return this
+        this.scene.physics.add.collider(this.scene.base, robot.blocks[0].image, () => {
             let amt = MINING_RATE_MS / 100
             if (robot.storedLunestone - amt > 0) {
                 this.scene.mainStats.incLunestone(amt)

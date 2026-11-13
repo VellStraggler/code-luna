@@ -67,7 +67,7 @@ export default class LaserShot {
                     hitbox.setBounce(1)
                     try {
                         let toObjR = toObj as ModularRobot
-                        toObj.takeDamage(10, toObjR.allBlocks[i])
+                        toObj.takeDamage(10, toObjR.blocks[i])
                     } catch {
                         toObj.takeDamage(10, toObj)
                     }

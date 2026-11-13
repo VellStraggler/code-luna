@@ -10,14 +10,14 @@ import { PartType } from "./PartType";
 import WheelBlock from "./WheelBlock";
 
 export default class BlockBuilder {
-    public static new(scene: MainScene, xy:XY, blockType: BlockType, parentBlock: ModularBlock | null,  robot: ModularRobot): ModularBlock {
+    public static new(scene: MainScene, offset:XY, blockType: BlockType, robot: ModularRobot): ModularBlock {
         switch (blockType) {
             case (BlockType.wheel):
-                return new WheelBlock(scene, xy,
-                    robot, parentBlock)
+                return new WheelBlock(scene, offset,
+                    robot)
             default:
-                return new ModularBlock(scene, xy,
-                    blockType, robot, parentBlock)
+                return new ModularBlock(scene, offset,
+                    blockType, robot)
         }
     }
 }
