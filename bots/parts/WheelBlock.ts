@@ -36,6 +36,7 @@ export default class WheelBlock extends ModularBlock {
     public override disconnect(scene: MainScene, robots: ModularRobots) {
         this.chassisImage?.destroy()
         this.chassisImage = null
+        this.robot.wheels = this.robot.wheels.filter(wheel => wheel != this)
         super.disconnect(scene, robots)
     }
     
