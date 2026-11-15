@@ -31,13 +31,12 @@ export default class ModularRobot implements IGameFighter{
     public latestDrillPart: ModularPart | null = null
     public guns: ModularPart[] = []
     public wheels: WheelBlock[] = []
+    private miningOverlaps: Phaser.Physics.Arcade.Collider[] = []
 
     private timeIdle = 0
 
     goal: XY | null = null
     
-    private hp = 100
-
     /** assetName: count, for quick evaluation of abilities */
     private objectCounts: {[key:string]: number} = {}
     private weight = 0;
@@ -53,8 +52,18 @@ export default class ModularRobot implements IGameFighter{
     private wheelCount = 0;
     
     storageSpace = 0;
-    storedCosmorite = this.baseEnergyNeed;
-    storedLunestone = 0;
+    get storedCosmorite() {
+        return this.blocks.reduce((total, block) => total + block.storedCosmorite, 0)
+    }
+    set storedCosmorite(amount: number) {
+        this.setStoredResource("storedCosmorite", amount)
+    }
+    get storedLunestone() {
+        return this.blocks.reduce((total, block) => total + block.storedLunestone, 0)
+    }
+    set storedLunestone(amount: number) {
+        this.setStoredResource("storedLunestone", amount)
+    }
     public isMiningThis: HPImage | null = null
     cores = 0;
     canCreate = false;
@@ -71,13 +80,24 @@ export default class ModularRobot implements IGameFighter{
     static create(scene: MainScene, x: number, y: number, blocktype: BlockType = BlockType.sleek) {
         let newRobot = new this(scene, xy(x,y))
         newRobot.addBlock(BlockBuilder.new(scene, xy(), blocktype, newRobot))
+        newRobot.storedCosmorite = newRobot.baseEnergyNeed
         newRobot.addEnemyCollider(scene.player)
         return newRobot
     }
 
     static createFromBlock(scene: MainScene, sourceBlock: ModularBlock) {
-        let newRobot = new this(scene, sourceBlock.globalPos)
-        newRobot.blocks.push(sourceBlock)
+        return this.createFromBlocks(scene, [sourceBlock])
+    }
+
+    private static createFromBlocks(scene: MainScene, blocks: ModularBlock[]) {
+        const anchor = blocks[0]
+        const offset = anchor.localPos
+        let newRobot = new this(scene, xy(anchor.image.x, anchor.image.y))
+        newRobot.movingDirectionRadians = anchor.robot.movingDirectionRadians
+        for (const block of blocks) {
+            block.localPos = block.localPos.subtract(offset)
+            newRobot.addBlock(block)
+        }
         newRobot.reload()
         newRobot.addEnemyCollider(scene.player)
         return newRobot
@@ -101,42 +121,127 @@ export default class ModularRobot implements IGameFighter{
         for(const block of this.blocks) {
             block.destroy()
         }
+        this.blocks = []
+        this.proxyGlobalBlock = null
+        this.goal = null
+        this.resetAbilities()
         this.scene.robots.robots = this.scene.robots.robots.filter(robot => robot !== this)
     }
 
-    /** Hitting a robot block immediately converts the block into a separate robot */
+    public absorb(robot: ModularRobot, offset: XY) {
+        if (robot === this) return this
+
+        const blocks = robot.blocks
+        robot.blocks = []
+        robot.destroy()
+
+        for (const block of blocks) {
+            block.localPos = block.localPos.add(offset)
+            this.addBlock(block)
+        }
+        return this.reload()
+    }
+
+    /** A broken block detaches, and any disconnected groups become separate robots. */
     takeDamage(amt: number, target: any) {
-        try {
-            console.log("took damage")
-            const block: ModularBlock = target as ModularBlock
-            block.hp-= amt
-            if(block.hp <= 0) {
-                if (this.blocks.length == 1) {
-                    this.destroy()
-                } else {
-                    this.remove(block)
-                    block.disconnect(this.scene, this.scene.robots, this)
-                }
-                this.reload()
-            }
-        } catch { 
+        const block = target as ModularBlock
+        if (!this.blocks.includes(block)) return
+        block.hp = Math.max(0, block.hp - amt)
+        block.updateDamageTint()
+        if (block.hp > 0) return
+
+        if (this.blocks.length == 1) {
+            this.destroy()
+        } else {
+            block.disconnect(this.scene, this.scene.robots, this)
         }
     }
     getHP(): number {
-        return this.hp
+        return this.blocks.reduce((total, block) => total + block.hp, 0)
     }
 
     remove(block: ModularBlock) {
-        console.log("length: " + this.blocks.length)
-        if(this.proxyGlobalBlock == block) {
-            this.proxyGlobalBlock = null
-        }
         this.blocks = this.blocks.filter(b => !b.equals(block))
+        if(this.proxyGlobalBlock == block) {
+            this.proxyGlobalBlock = this.blocks[0] ?? null
+        }
         console.log("length after: " + this.blocks.length)
         return block
     }
 
+    public splitDisconnected() {
+        const unvisited = new Set(this.blocks)
+        const components: ModularBlock[][] = []
+        for (const start of this.blocks) {
+            if (!unvisited.delete(start)) continue
+            const connected = new Set([start])
+            const queue = [start]
+            for (let i = 0; i < queue.length; i++) {
+                const current = queue[i]
+                for (const block of unvisited) {
+                    const dx = Math.abs(block.localPos.x - current.localPos.x)
+                    const dy = Math.abs(block.localPos.y - current.localPos.y)
+                    if ((dx == BLOCK_RES && dy == 0) || (dy == BLOCK_RES && dx == 0)) {
+                        unvisited.delete(block)
+                        connected.add(block)
+                        queue.push(block)
+                    }
+                }
+            }
+            // Preserve storage fill/drain order rather than the traversal order.
+            components.push(this.blocks.filter(block => connected.has(block)))
+        }
+
+        if (components.length == 0) {
+            this.destroy()
+            return
+        }
+        const retained = components.find(component =>
+            this.proxyGlobalBlock != null && component.includes(this.proxyGlobalBlock)
+        ) ?? components[0]
+        this.blocks = retained
+        this.proxyGlobalBlock = this.proxyGlobalBlock && retained.includes(this.proxyGlobalBlock)
+            ? this.proxyGlobalBlock : retained[0]
+        this.position = xy(this.proxyGlobalBlock.image.x, this.proxyGlobalBlock.image.y)
+            .subtract(this.proxyGlobalBlock.localPos)
+
+        for (const component of components) {
+            if (component !== retained) {
+                this.scene.robots.push(ModularRobot.createFromBlocks(this.scene, component))
+            }
+        }
+        this.reload()
+    }
+
+    private setStoredResource(resource: "storedCosmorite" | "storedLunestone", total: number) {
+        let change = Math.max(0, total) - this.blocks.reduce((sum, block) => sum + block[resource], 0)
+        if (change > 0) {
+            for (const block of this.blocks) {
+                const free = Math.max(0, block.blockType.storage - block.storedCosmorite - block.storedLunestone)
+                const stored = Math.min(change, free)
+                block[resource] += stored
+                change -= stored
+                if (change <= 0) break
+            }
+        } else {
+            for (let i = this.blocks.length - 1; i >= 0 && change < 0; i--) {
+                const block = this.blocks[i]
+                const drained = Math.min(-change, block[resource])
+                block[resource] -= drained
+                change += drained
+            }
+        }
+    }
+
     private resetAbilities() {
+        this.miningOverlaps.forEach(overlap => overlap.destroy())
+        this.miningOverlaps = []
+        this.parts = []
+        this.guns = []
+        this.wheels = []
+        this.latestCpuPart = null
+        this.latestDrillPart = null
+        this.isMiningThis = null
         this.objectCounts = {}
         this.weight = 0
         this.storageSpace = 0
@@ -174,11 +279,11 @@ export default class ModularRobot implements IGameFighter{
         }
     }
 
-    getCalculatedEnergyUse() {
+    getCalculatedEnergyUse(assumeMoving: boolean = false) {
         let use = this.latestDrillPart?.getEnergyUse() ?? 0
         use += this.guns[0]?.getEnergyUse() ?? 0 * this.guns.length
         for (const wheel of this.wheels) {
-            use += wheel.getEnergyUse()
+            use += assumeMoving ? ENERGY_MS_PER_WHEEL : wheel.getEnergyUse()
         }
         return use
     }
@@ -241,7 +346,7 @@ export default class ModularRobot implements IGameFighter{
         }
     }
     private propagateResistance() {
-        if (this.maxSpeed == 0 && this.blocks.length != 1){
+        if (this.wheels.length == 0 && this.blocks.length != 1){
             this.blocks.forEach(block => {
                 block.image.setImmovable(true)
             });
@@ -327,12 +432,14 @@ export default class ModularRobot implements IGameFighter{
     }
 
     registerPart(part: ModularPart) {
+        this.parts.push(part)
         switch (part.itemName) {
             case PART_DRILL_NAME:
                 this.allowMining(this.scene.cosmoriteOre, part)
                 break
             case PART_CPU_NAME:
                 this.latestCpuPart = part as CpuPart
+                this.latestCpuPart.sourceRobot = this
                 break
             case PART_GUN_NAME:
                 this.guns.push(part)
@@ -372,7 +479,7 @@ export default class ModularRobot implements IGameFighter{
 
         if(this.proxyGlobalBlock != null) {
             if(this.proxyGlobalBlock.image.body == undefined) return // this guy is in fact dead
-            if (this.hp <= 0) return
+            if (this.getHP() <= 0) return
         }
         let proxy = this.proxyGlobalBlock
 
@@ -507,24 +614,33 @@ export default class ModularRobot implements IGameFighter{
         return newRobot.reload()
     }
 
-    /** Takes the block's position and rounds it to our robot's block grid */
+    /** Adds a block using an offset in this robot's local grid. */
     public addBlock(block:ModularBlock) {
-        let gridOffset = xy(this.position.x % BLOCK_RES, this.position.y % BLOCK_RES)
-        block.globalPos = block.globalPos.subtract(gridOffset)
+        block.robot = this
+        block.globalPos = this.position.add(block.localPos)
+        block.image.setPosition(block.globalPos.x, block.globalPos.y)
+        const velocity = this.proxyGlobalBlock?.image.body?.velocity
+        if (velocity) block.image.setVelocity(velocity.x, velocity.y)
+        for (const part of block.modularParts) {
+            if (part instanceof CpuPart) part.sourceRobot = this
+            part.update(false)
+        }
 
         if(this.blocks.length == 0) {
             this.proxyGlobalBlock = block
         }
         this.blocks.push(block)
         this.scene.uiCamera.ignore(block.image)
+        this.scene.robots?.allowOffloading(this)
         return this
     }
 
     private allowMining(cosmoriteOre: HPImage, drillPart: ModularPart) {
         this.latestDrillPart = drillPart
-        this.scene.physics.add.overlap(this.latestDrillPart.image, cosmoriteOre, () => {
+        if (!cosmoriteOre) return
+        this.miningOverlaps.push(this.scene.physics.add.overlap(drillPart.image, cosmoriteOre, () => {
             this.isMiningThis = cosmoriteOre
-        })
+        }))
     }
 
     public addCollider(scene: MainScene, offender: HPImage | Phaser.Physics.Arcade.Image) {
@@ -569,7 +685,10 @@ export default class ModularRobot implements IGameFighter{
     }
 
     public getMeterRange() {
-        return this.storedCosmorite / (this.wheelCount * ENERGY_MS_PER_WHEEL)
+        if (this.storedCosmorite <= 0 || this.maxSpeed <= 0) return 0
+        const drivingEnergyPerSecond = this.getCalculatedEnergyUse(true)
+        const speedMetersPerSecond = this.maxSpeed / BLOCK_RES
+        return (this.storedCosmorite / drivingEnergyPerSecond) * speedMetersPerSecond
     }
 
     public aim(target: XY) {

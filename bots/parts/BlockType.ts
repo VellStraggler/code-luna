@@ -1,4 +1,4 @@
-import { BLOCK_WHEEL_NAME } from "../../main/constants";
+import { BLOCK_WHEEL_NAME, FACTORY_BLOCK } from "../../main/constants";
 import IGameItemType from "../contracts/IGameItemType";
 
 export class BlockType implements IGameItemType{
@@ -15,14 +15,14 @@ export class BlockType implements IGameItemType{
     public readonly availableFrames: number;
     
     //                               asset           weig gas s p r s storage
-    static aluminum = new BlockType('block-aluminum',1   ,0  ,1,1,1,1,2)
-    static steel    = new BlockType('block-steel'   ,3   ,2  ,2,1,2,4,2)
-    static wheel    = new BlockType(BLOCK_WHEEL_NAME,0.5 ,2  ,1,0,1,1,0,2)
+    static aluminum = new BlockType('block-aluminum',1   ,0  ,1,1,1,2,2)
+    static steel    = new BlockType('block-steel'   ,3   ,2  ,2,1,2,5,2)
+    static wheel    = new BlockType(BLOCK_WHEEL_NAME,0.5 ,2  ,1,0,1,2,0,2)
     static frame    = new BlockType('block-frame'   ,0.5 ,3  ,1,4,3,1,0)
-    static storage  = new BlockType('block-storage' ,1.5 ,2  ,1,0,2,1,10)
-    static tread    = new BlockType('block-tread'   ,0.75,2.5,1,0,2,2,0)
-    static factory  = new BlockType('block-factory' ,2   ,3  ,3,0,3,0,0)
-    static sleek    = new BlockType('block-sleek'   ,2   ,2  ,1,2,3,2,.5)
+    static storage  = new BlockType('block-storage' ,1.5 ,2  ,1,0,2,2,10)
+    static tread    = new BlockType('block-tread'   ,0.75,2.5,1,0,2,3,0)
+    static factory  = new BlockType(FACTORY_BLOCK   ,2   ,3  ,3,0,3,1,0)
+    static sleek    = new BlockType('block-sleek'   ,2   ,2  ,1,2,3,3,.5)
     static null     = new BlockType('null')
     
     private static readonly dict: { [key:string]: BlockType } = {};

@@ -16,7 +16,7 @@ export default class HPImage extends Phaser.Physics.Arcade.Image implements IGam
     public readonly textureless: boolean
     public hurtSound!: HTMLAudioElement
     public isFrameOne: boolean = false
-    private shadow: Phaser.Physics.Arcade.Image | null
+    protected shadow: Phaser.Physics.Arcade.Image | null
     scene: MainScene
     
     constructor(scene: MainScene, x: number, y:number, 

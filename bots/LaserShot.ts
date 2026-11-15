@@ -1,4 +1,4 @@
-import { generateId, LASER_LIFE, LASER_SPEED } from "../main/constants";
+import { generateId, LASER_DAMAGE, LASER_LIFE, LASER_SPEED } from "../main/constants";
 import MainScene from "../CodeLuna";
 import { XY } from "../main/xy";
 import HPImage from "../main/HPImage";
@@ -48,16 +48,17 @@ export default class LaserShot {
         for(const enemy of enemies) {
             for(let i = 0; i < (enemy.getHitboxes().length); i++) {
                 const hitbox = enemy.getHitboxes()[i]
+                const targetBlock = enemy instanceof ModularRobot ? enemy.blocks[i] : null
                 scene.physics.add.collider(this.image, hitbox, () => {
+                    if (this.dead) return
+                    this.dead = true
                     hitbox.setBounce(1)
-                    try {
-                        let toObjR = enemy as ModularRobot
-                        enemy.takeDamage(10, toObjR.blocks[i])
-                    } catch {
-                        enemy.takeDamage(10, enemy)
+                    if (targetBlock) {
+                        targetBlock.takeDamage(LASER_DAMAGE)
+                    } else {
+                        enemy.takeDamage(LASER_DAMAGE, enemy)
                     }
                     body.setVelocity(0,0)
-                    this.dead = true
                 })
             }
         }

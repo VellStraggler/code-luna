@@ -26,8 +26,8 @@ export class ModularPart extends BaseGameItem {
     constructor(scene: MainScene, parentBlock: ModularBlock, type: string) {
 
         let partType = PartType.get(type)
-        let x = parentBlock.globalPos.x + parentBlock.localPos.x + partType.offset.x
-        let y = parentBlock.globalPos.y + parentBlock.localPos.y + partType.offset.y
+        let x = parentBlock.globalPos.x + partType.offset.x
+        let y = parentBlock.globalPos.y + partType.offset.y
 
         super(
             scene, 

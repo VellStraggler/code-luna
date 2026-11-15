@@ -3,6 +3,7 @@
 import * as Phaser from 'phaser'
 import MainStats from "./main/MainStats"
 import Player, { PlayerState } from "./main/Player"
+import Base from "./main/Base"
 import GUI from "./main/gui"
 import HPImage from './main/HPImage'
 import { BASIC_ASSET_NAMES, WINDOW, BLOCK_RES, LASER_TEST_MS, FRAME_TIME_MS, BASE_POS, GAME_SPEED, REFINEMENT_RATE_MS, MINING_RATE_MS, COSMORITE_ORE, TWO_FRAME_ASSETS, F1, F0, BLOCK_DEPTH, FACTORY_BLOCK } from './main/constants'
@@ -15,18 +16,19 @@ import Logic from './main/logic'
 import ModularRobot from './bots/ModularRobot'
 import { BlockType } from './bots/parts/BlockType'
 import ModularBlock from './bots/parts/ModularBlock'
+import { PartType } from './bots/parts/PartType'
 
 export default class MainScene extends Phaser.Scene {
     public player!: Player
     private ground!: Phaser.GameObjects.TileSprite
     public robots!: ModularRobots
     public lasers: LaserShot[] = []
-    public base!: HPImage
+    public base!: Base
     public cosmoriteOre!: HPImage
     public mainStats!: MainStats
     public GUI!: GUI
     public uiCamera!: Phaser.Cameras.Scene2D.Camera
-    public baseLayer: (Phaser.Physics.Arcade.Image | Phaser.GameObjects.Image)[] = []
+    public baseLayer: Phaser.GameObjects.GameObject[] = []
 
     private controls!: Controls
     public typing = false
@@ -150,8 +152,7 @@ export default class MainScene extends Phaser.Scene {
     }
 
     createBase(x:number, y:number) {
-        this.base = new HPImage(this, x, y,"structure-base")
-            .setImmovable(true)
+        this.base = new Base(this, x, y)
         this.physics.add.overlap(this.player, this.base, () => {
             this.base.isOverlapped = true
         })
@@ -250,33 +251,36 @@ export default class MainScene extends Phaser.Scene {
         console.log(fromObj.getPosition() + " as player, clicked at: " + position.worldX + ", " + position.worldY)
         let dist = Logic.getDistFromClick(fromObj, position)
         if (dist > BLOCK_RES * 6) return
-        console.log(dist)
-        // find 2 nearest blocks
+        // find 2 nearest robots and the nearest blocks within them
         let nearestBlocks: ModularBlock[] = []
-        let nearestDists: number[] = []
         for (const robot of this.robots) {
+            let nearestBlock: ModularBlock | null = null
+            let nearestDist = BLOCK_RES * 2
             for (const block of robot.blocks) {
                 let dist = Logic.getDist(block.image.getPosition(), xy(position.worldX, position.worldY))
-                if (dist < BLOCK_RES * 2) {
-                    if (nearestBlocks.length == 0) {
-                        nearestBlocks.push(block)
-                        nearestDists.push(dist)
-                    } else {
-                        if (dist < nearestDists[nearestDists.length-1]) {
-                            nearestBlocks.push(block)
-                            nearestDists.push(dist)
-                        }
-                    }
+                if (dist < nearestDist) {
+                    nearestBlock = block
+                    nearestDist = dist
                 }
             }
+            if (nearestBlock) nearestBlocks.push(nearestBlock)
         }
-        // connect them
+        const click = xy(position.worldX, position.worldY)
+        nearestBlocks.sort((a, b) =>
+            Logic.getDist(a.image.getPosition(), click) - Logic.getDist(b.image.getPosition(), click))
+        // Weld nearby robots, or repair a directly clicked block on a lone robot.
         if (nearestBlocks.length >= 2) {
-            let blockA = nearestBlocks[nearestBlocks.length - 1]
-            let blockB = nearestBlocks[nearestBlocks.length - 2]
-
-            blockA.connectBlock(blockB, "right")
-            this.sound.play("weld")
+            let blockA = nearestBlocks[0]
+            let blockB = nearestBlocks[1]
+            if (blockA.connectRobotAt(blockB)) {
+                this.sound.play("weld")
+            }
+        } else if (nearestBlocks.length == 1) {
+            const block = nearestBlocks[0]
+            if (block.hp < block.maxHP && block.image.getBounds().contains(click.x, click.y)) {
+                block.resetHP()
+                this.sound.play("weld")
+            }
         }
     }
 
@@ -288,6 +292,7 @@ export default class MainScene extends Phaser.Scene {
             let roundx = Math.round(position.worldX/BLOCK_RES) * BLOCK_RES
             let roundy = Math.round(position.worldY/BLOCK_RES) * BLOCK_RES
             this.robots.push(ModularRobot.create(this, roundx, roundy)
+                .addPart(PartType.partCpu)
                 .addEnemyCollider(this.player))
         }
     }

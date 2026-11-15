@@ -74,14 +74,16 @@ export const HR_IN_MS = 60*60*1000
 export const ENERGY_USE_MULT = 0.0001
 export const ENERGY_MS_PER_WHEEL = 0.0005 
 export const LASER_ENERGY_USE = 1
+export const LASER_DAMAGE = 1
 export const LASER_SPEED = 400
 export const LASER_LIFE = 2
-export const DEFAULT_DRAG = 200
+export const DEFAULT_DRAG = 150
 export const REFINEMENT_RATE_MS = 0.2
 export const MINING_RATE_MS = 2
 export const STONE_MINE_RATE = 0.34
 export const GAS_MINE_RATE = 0.66
 export const MAX_SPEED = 80
+export const BASE_ZONE_RADIUS = BLOCK_RES * 4
 
 export const IMPLEMENTATION_ERROR = "This method should be overridden, but it wasn't."
 

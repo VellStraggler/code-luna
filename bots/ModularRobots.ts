@@ -5,18 +5,27 @@ import { BlockType } from "./parts/BlockType"
 import ModularRobot from "./ModularRobot"
 import { PartType } from "./parts/PartType"
 import { MINING_RATE_MS } from "../main/constants"
+import ModularBlock from "./parts/ModularBlock"
+import * as Phaser from 'phaser'
 
 export default class ModularRobots {
     robots: ModularRobot[]
     private scene: MainScene
+    private offloadingBlocks = new WeakSet<ModularBlock>()
+    private offloadedThisStep = new Set<ModularRobot>()
     
     constructor(scene: MainScene, robots: ModularRobot[] = []) {
         this.robots = robots
         this.scene = scene
+        scene.physics.world.on(Phaser.Physics.Arcade.Events.WORLD_STEP, () => {
+            this.offloadedThisStep.clear()
+        })
+        for (const robot of robots) this.allowOffloading(robot)
     }
 
     push(newRobot: ModularRobot) {
         this.robots.push(newRobot)
+        this.allowOffloading(newRobot)
     }
 
     get(index:number) {
@@ -70,22 +79,35 @@ export default class ModularRobots {
             .addEnemyCollider(this.scene.player)
             .reload()
         this.robots.push(robot)
-        this.allowOffloading(robot)
         return robot
     }
 
     allowOffloading(robot: ModularRobot) {
-        if (robot.blocks.length == 0) return this
-        this.scene.physics.add.collider(this.scene.base, robot.blocks[0].image, () => {
-            let amt = MINING_RATE_MS / 100
-            if (robot.storedLunestone - amt > 0) {
-                this.scene.mainStats.incLunestone(amt)
-                robot.storedLunestone -= amt
-            }
-            if (robot.storedCosmorite - amt > robot.baseEnergyNeed) {
-                this.scene.mainStats.incCosmorite(amt)
-                robot.storedCosmorite -= amt
-            }
-        })
+        for (const block of robot.blocks) {
+            if (this.offloadingBlocks.has(block)) continue
+            this.offloadingBlocks.add(block)
+            const collider = this.scene.physics.add.collider(this.scene.base, block.image)
+            const overlap = this.scene.physics.add.overlap(this.scene.base.zone, block.image, () => {
+                const owner = block.robot
+                if (!owner.blocks.includes(block) || this.offloadedThisStep.has(owner)) return
+                this.offloadedThisStep.add(owner)
+                const amt = MINING_RATE_MS / 100
+                const lunestone = Math.min(amt, owner.storedLunestone)
+                const cosmorite = Math.min(amt, Math.max(0, owner.storedCosmorite - owner.baseEnergyNeed))
+                if (lunestone > 0) {
+                    this.scene.mainStats.incLunestone(lunestone)
+                    owner.storedLunestone -= lunestone
+                }
+                if (cosmorite > 0) {
+                    this.scene.mainStats.incCosmorite(cosmorite)
+                    owner.storedCosmorite -= cosmorite
+                }
+            })
+            block.image.once(Phaser.GameObjects.Events.DESTROY, () => {
+                collider.destroy()
+                overlap.destroy()
+            })
+        }
+        return this
     }
 }

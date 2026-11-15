@@ -9,10 +9,48 @@ export default class Player extends HPImage {
 
     constructor(scene: MainScene, x: number, y: number, texture: string) {
         super(scene, x, y, texture)
+        this.updateShadowTexture()
+        this.updateShadow()
         this.setScale(0.75)
             .setSize(9,12)
             .setDrag(700)
             .setDepth(BLOCK_DEPTH)
+    }
+
+    override updateShadow() {
+        this.shadow?.setPosition(this.x, this.y)
+    }
+
+    override setTexture(key: string) {
+        super.setTexture(key)
+        if (this.shadow) {
+            this.updateShadowTexture()
+        }
+        return this
+    }
+
+    private updateShadowTexture() {
+        const key = this.texture.key + "-player-shadow"
+        const frame = this.frame
+        const width = frame.cutWidth
+        const height = frame.cutHeight
+        const shear = 0.3
+        const squash = 0.85
+        const canvasWidth = Math.ceil(width + height * shear)
+
+        if (!this.scene.textures.exists(key)) {
+            const texture = this.scene.textures.createCanvas(key, canvasWidth, height)
+            if (!texture) return
+            const context = texture.getContext()
+            context.imageSmoothingEnabled = false
+            // Keep the feet fixed while pushing the top right and down.
+            context.setTransform(1, 0, -shear, squash, height * shear, height * (1 - squash))
+            context.drawImage(frame.source.image as CanvasImageSource,
+                frame.cutX, frame.cutY, width, height, 0, 0, width, height)
+            texture.refresh()
+        }
+        this.shadow?.setTexture(key)
+            .setOrigin(this.originX * width / canvasWidth, this.originY)
     }
 
     toggleHoldingGun() {

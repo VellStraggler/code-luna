@@ -9,6 +9,8 @@ import { PartType } from "./PartType";
 import ModularRobots from "../ModularRobots";
 import CpuPart from "./CpuPart";
 import BaseGameItem from "../contracts/BaseGameItem";
+import * as Phaser from 'phaser'
+
 
 export default class ModularBlock extends BaseGameItem {
 
@@ -16,7 +18,8 @@ export default class ModularBlock extends BaseGameItem {
     modularParts: ModularPart[] = [];
 
     readonly blockType: BlockType;
-    private energyStored = 0
+    storedCosmorite = 0
+    storedLunestone = 0
     hp = 0
 
     constructor(
@@ -32,7 +35,7 @@ export default class ModularBlock extends BaseGameItem {
 
         super(
             scene,
-            robot.position ?? offset,
+            xy(x, y),
             new HPImage(scene, x, y, blockType.assetName),
             blockType.assetName,
             blockType.availableFrames -1
@@ -42,13 +45,30 @@ export default class ModularBlock extends BaseGameItem {
         this.blockType = blockType
         this.resetHP()
 
-        // derive starting health from the blockType
-        this.hp = blockType.strength
-
         this.image.setBodySize(BLOCK_RES-2, BLOCK_RES-2, true)
             .setDrag(DEFAULT_DRAG)
             .setDepth(BLOCK_DEPTH)
         scene.baseLayer.push(this.image)
+    }
+
+    public connectRobotAt(otherBlock: ModularBlock): boolean {
+        if (this.robot === otherBlock.robot) return false
+
+        const dx = otherBlock.image.x - this.image.x
+        const dy = otherBlock.image.y - this.image.y
+        const direction = Math.abs(dx) >= Math.abs(dy)
+            ? xy(dx < 0 ? -1 : 1, 0)
+            : xy(0, dy < 0 ? -1 : 1)
+        const offset = this.localPos.add(direction.multiply(BLOCK_RES)).subtract(otherBlock.localPos)
+
+        // Move the entire donor by one translation, without overlapping the survivor.
+        if (otherBlock.robot.blocks.some(block =>
+            this.robot.blocks.some(existing => existing.localPos.equals(block.localPos.add(offset)))
+        )) return false
+
+        this.robot.position = xy(this.image.x, this.image.y).subtract(this.localPos)
+        this.robot.absorb(otherBlock.robot, offset)
+        return true
     }
 
     /** adds block. Assigns global position and this as the parent block.
@@ -92,45 +112,61 @@ export default class ModularBlock extends BaseGameItem {
             part = new ModularPart(scene, this, partType.assetName)
         }
         this.modularParts.push(part)
+        this.scene.uiCamera.ignore(part.image)
+        this.updateDamageTint()
         return this
     }
     
     public disconnect(scene: MainScene, robots: ModularRobots, robot: ModularRobot | null = null) {
-
-        robot?.remove(this)
+        const sourceRobot = robot ?? this.robot
+        if (!sourceRobot.blocks.includes(this) || sourceRobot.blocks.length <= 1) return
+        sourceRobot.remove(this)
+        this.resetHP()
         let newRobot = ModularRobot.createFromBlock(scene, this)
-        
-        for (const part of this.modularParts) {
-            part.globalPos = this.globalPos;
-            part.image.setPosition(this.globalPos.x, this.globalPos.y);
-            part.update(scene.animateScene);
-        }
         robots.push(newRobot)
+        sourceRobot.splitDisconnected()
+        return newRobot
     }
 
     takeDamage(amt: number) {
         this.robot.takeDamage(amt, this)
     }
 
+    /** Strength sets the 1-damage laser hit count (minimum one).
+     * Block and part redness tracks health lost; detaching resets health and tint.
+     */
+    get maxHP() {
+        return Math.max(1, this.blockType.strength)
+    }
+
     resetHP() {
-        this.hp = this.blockType.strength
+        this.hp = this.maxHP
+        this.updateDamageTint()
+    }
+
+    updateDamageTint() {
+        const healthFraction = Math.max(0, Math.min(1, this.hp / this.maxHP))
+        const channel = Math.round(255 * healthFraction)
+        const tint = Phaser.Display.Color.GetColor(255, channel, channel)
+        for (const image of [this.image, ...this.modularParts.map(part => part.image)]) {
+            if (healthFraction == 1) {
+                image.clearTint()
+            } else {
+                image.setTint(tint)
+            }
+        }
     }
 
     getEnergyStored() {
-        return this.energyStored
+        return this.storedCosmorite
     }
 
     // returns amount that didn't fit in storage
     storeEnergy(amount:number): number {
-        let total = this.getEnergyStored() + amount
-        if (total > this.getEnergyLimit() ) {
-            let leftovers = total - this.getEnergyLimit()
-            this.energyStored = this.getEnergyLimit()
-            return leftovers
-        } else {
-            this.energyStored += amount
-            return 0
-        }
+        const free = Math.max(0, this.getEnergyLimit() - this.storedCosmorite - this.storedLunestone)
+        const stored = Math.min(Math.max(0, amount), free)
+        this.storedCosmorite += stored
+        return amount - stored
     }
 
     getEnergyLimit() {

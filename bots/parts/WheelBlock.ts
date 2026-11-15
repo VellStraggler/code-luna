@@ -3,7 +3,6 @@ import { BLOCK_DEPTH, BLOCK_RES, Dirs, ENERGY_MS_PER_WHEEL, WHEEL_CHASSIS_NAME }
 import Logic from "../../main/logic";
 import { xy, XY } from "../../main/xy";
 import ModularRobot from "../ModularRobot";
-import ModularRobots from "../ModularRobots";
 import { BlockType } from "./BlockType";
 import ModularBlock from "./ModularBlock";
 import * as Phaser from 'phaser'
@@ -32,17 +31,21 @@ export default class WheelBlock extends ModularBlock {
         this.scene.uiCamera.ignore(this.chassisImage)
         this.scene.baseLayer.push(this.chassisImage)
         this.rotateChassis(dir)
+        this.updateDamageTint()
     }
 
-    public override disconnect(scene: MainScene, robots: ModularRobots) {
-        super.disconnect(scene, robots)
-        this.robot.wheels = this.robot.wheels.filter(wheel => wheel != this)
-        this.chassisImage?.destroy()
-        this.chassisImage = null
+    override updateDamageTint() {
+        super.updateDamageTint()
+        if (this.image.isTinted) {
+            this.chassisImage?.setTint(this.image.tintTopLeft)
+        } else {
+            this.chassisImage?.clearTint()
+        }
     }
 
     public override destroy() {
-        this.disconnect(this.scene, this.scene.robots)
+        this.chassisImage?.destroy()
+        this.chassisImage = null
         super.destroy()
     }
     

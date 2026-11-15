@@ -49,7 +49,7 @@ export class UIIconButton {
     constructor(scene: MainScene, x: number, y: number, iconName: string = "null", onClick: () => any, deselectAll: () => any) {
         this.bg = scene.add.rectangle(x, y, TOOLBOX_WIDTH, TOOLBOX_WIDTH, MyColors.white)
             .setStrokeStyle(0, MyColors.black)
-            .setInteractive()
+            .setInteractive({ useHandCursor: true })
             .on('pointerdown', () => {
                 if (this.selected) {
                     deselectAll()
@@ -150,7 +150,7 @@ export class UITextButtonLine extends UITextLine {
         super(scene, x, y, "-" + staticPrefix + "()", align)
         this.textObject
             .setFontStyle('bold')
-            .setInteractive()
+            .setInteractive({ useHandCursor: true })
             .on('pointerdown', () => {
                 onClick()
             })
@@ -170,7 +170,7 @@ export class UIStatButtonLine extends UIStatLine {
         super(scene, x, y, staticPrefix, () => {return onClick()}, align)
         this.textObject
             .setFontStyle('bold')
-            .setInteractive()
+            .setInteractive({ useHandCursor: true })
             .on('pointerdown', () => {
                 onClick()
             })
