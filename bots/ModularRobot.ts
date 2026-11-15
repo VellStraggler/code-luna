@@ -11,6 +11,7 @@ import * as Phaser from 'phaser'
 import CpuPart from "./parts/CpuPart";
 import BlockBuilder from "./parts/builderClasses";
 import WheelBlock from "./parts/WheelBlock";
+import Logic from "../main/logic";
 
 /**
  * Holds larger robot data, such as the supposed source block,
@@ -28,7 +29,7 @@ export default class ModularRobot implements IGameFighter{
 
     public latestCpuPart: CpuPart | null = null
     public latestDrillPart: ModularPart | null = null
-    public latestGunPart: ModularPart | null = null
+    public guns: ModularPart[] = []
     public wheels: WheelBlock[] = []
 
     private timeIdle = 0
@@ -57,7 +58,7 @@ export default class ModularRobot implements IGameFighter{
     public isMiningThis: HPImage | null = null
     cores = 0;
     canCreate = false;
-    guns = 0; canSend = false; canReceive = false;
+    canSend = false; canReceive = false;
 
     /* use create(...) or createFromBlock(...) instead **/
     private constructor(scene: MainScene, position: XY, startingBlockType: BlockType = BlockType.sleek) {
@@ -84,6 +85,10 @@ export default class ModularRobot implements IGameFighter{
         return this.position;
     }
 
+    getHitboxes(): HPImage[] {
+        return this.blocks.map(block => block.image)
+    }
+
     equals(other:ModularRobot) {
         return other.id == this.id
     }
@@ -99,14 +104,16 @@ export default class ModularRobot implements IGameFighter{
     /** Hitting a robot block immediately converts the block into a separate robot */
     takeDamage(amt: number, target: any) {
         try {
+            console.log("took damage")
             const block: ModularBlock = target as ModularBlock
             block.hp-= amt
             if(block.hp <= 0) {
                 if (this.blocks.length == 1) {
                     this.destroy()
                 } else {
+                    this.remove(block)
                     block.disconnect(this.scene, this.scene.robots, this)
-                    block.resetHP()
+                    // block.resetHP()
                 }
                 this.reload()
             }
@@ -118,7 +125,12 @@ export default class ModularRobot implements IGameFighter{
     }
 
     remove(block: ModularBlock) {
+        console.log("length: " + this.blocks.length)
+        if(this.proxyGlobalBlock == block) {
+            this.proxyGlobalBlock = null
+        }
         this.blocks = this.blocks.filter(b => !b.equals(block))
+        console.log("length after: " + this.blocks.length)
         return block
     }
 
@@ -134,11 +146,11 @@ export default class ModularRobot implements IGameFighter{
         this.maxCharge = 0
         this.cores = 0
         this.canCreate = false
-        this.guns = 0; this.canSend = false; this.canReceive = false
+        this.canSend = false; this.canReceive = false
     }
 
     canShoot() {
-        return (this.guns > 0 && this.hasCpu() && this.storedCosmorite  - LASER_ENERGY_USE >= 0)
+        return (this.guns.length > 0 && this.hasCpu() && this.storedCosmorite - LASER_ENERGY_USE >= 0)
     }
 
     canMove() {
@@ -147,9 +159,10 @@ export default class ModularRobot implements IGameFighter{
 
     shootLaser() {
         if (this.canShoot()) {
-            this.latestGunPart?.activate()
+            this.guns.forEach(gun => gun.activate())
         }
-        this.latestGunPart?.deactivate()
+        this.guns.forEach(gun => gun.deactivate())
+        return 1
     }
 
     useEnergy(amt: number) {
@@ -161,7 +174,7 @@ export default class ModularRobot implements IGameFighter{
 
     getCalculatedEnergyUse() {
         let use = this.latestDrillPart?.getEnergyUse() ?? 0
-        use += this.latestGunPart?.getEnergyUse() ?? 0 * this.guns
+        use += this.guns[0]?.getEnergyUse() ?? 0 * this.guns.length
         for (const wheel of this.wheels) {
             use += wheel.getEnergyUse()
         }
@@ -202,7 +215,6 @@ export default class ModularRobot implements IGameFighter{
                 case(PART_DRILL_NAME):
                     break
                 case(PART_GUN_NAME):
-                    this.guns = count
                     break
                 case('part-radio-transmitter'):
                     this.canSend = true
@@ -291,7 +303,6 @@ export default class ModularRobot implements IGameFighter{
         for (const block of this.blocks) {
             this.addToObjectCounts(block.itemName)
             this.registerBlock(block)
-            this.scene.uiCamera.ignore(block.image)
 
             //add to totals
             for (const part of block.modularParts) {
@@ -300,10 +311,16 @@ export default class ModularRobot implements IGameFighter{
             }
             
             // getting chassis rotation:
-            // for (const block of this.allBlocks) {
-            //     const dir = Logic.getDir(block.localPos, childBlock.localPos)
-            //     childBlock.rotateChassis(dir)
-            // }
+            for (const wheel of this.wheels) {
+                for(const block of this.blocks) {
+                    if (block.itemName == BLOCK_WHEEL_NAME) continue
+                    let diff = wheel.localPos.subtract(block.localPos)
+                    if(Math.abs(diff.x) + Math.abs(diff.y) == BLOCK_RES) {
+                        const dir = Logic.getDir(block.localPos, wheel.localPos)
+                        wheel.rotateChassis(dir)
+                    }
+                }
+            }
         }
     }
 
@@ -316,7 +333,7 @@ export default class ModularRobot implements IGameFighter{
                 this.latestCpuPart = part as CpuPart
                 break
             case PART_GUN_NAME:
-                this.latestGunPart = part
+                this.guns.push(part)
             default:
                 break
         }
@@ -497,6 +514,7 @@ export default class ModularRobot implements IGameFighter{
             this.proxyGlobalBlock = block
         }
         this.blocks.push(block)
+        this.scene.uiCamera.ignore(block.image)
         return this
     }
 
@@ -554,15 +572,13 @@ export default class ModularRobot implements IGameFighter{
 
     public aim(target: XY) {
         if (!this.hasCpu()) return
-        for (const part of this.parts) {
-            if(part.partType.assetName == PART_GUN_NAME) {
-                part.rotate(
-                    Phaser.Math.Angle.Between(
-                        part.image.x, part.image.y,
-                        target.x, target.y
-                    ) + (Phaser.Math.PI_OVER_2) // so things are drawn pointing up
-                )
-            }
+        for (const gun of this.guns) {
+            gun.rotate(
+                Phaser.Math.Angle.Between(
+                    gun.image.x, gun.image.y,
+                    target.x, target.y
+                ) + (Phaser.Math.PI_OVER_2) // so things are drawn pointing up
+            )
         }
     }
 

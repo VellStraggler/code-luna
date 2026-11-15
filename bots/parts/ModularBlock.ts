@@ -40,6 +40,7 @@ export default class ModularBlock extends BaseGameItem {
         this.robot = robot
         this.localPos = localPos
         this.blockType = blockType
+        this.resetHP()
 
         // derive starting health from the blockType
         this.hp = blockType.strength
@@ -97,16 +98,18 @@ export default class ModularBlock extends BaseGameItem {
     public disconnect(scene: MainScene, robots: ModularRobots, robot: ModularRobot | null = null) {
 
         robot?.remove(this)
-        let newRobot = ModularRobot.create(scene, this.globalPos.x + this.localPos.x, this.globalPos.y + this.localPos.y)
-            .addBlock(this)
+        let newRobot = ModularRobot.createFromBlock(scene, this)
         
         for (const part of this.modularParts) {
             part.globalPos = this.globalPos;
             part.image.setPosition(this.globalPos.x, this.globalPos.y);
             part.update(scene.animateScene);
         }
-
         robots.push(newRobot)
+    }
+
+    takeDamage(amt: number) {
+        this.robot.takeDamage(amt, this)
     }
 
     resetHP() {
@@ -136,7 +139,9 @@ export default class ModularBlock extends BaseGameItem {
 
     addEnemyCollider(scene: MainScene, offender: HPImage | Phaser.Physics.Arcade.Image) {
         scene.physics.add.collider(offender, this.image, () => {
-            this.robot.proxyGlobalBlock = this
+            if(this.robot.blocks.includes(this)) {
+                this.robot.proxyGlobalBlock = this
+            }
         })
     }
 
@@ -146,6 +151,7 @@ export default class ModularBlock extends BaseGameItem {
      * Handles velocity clamping as well
     */
     override update(animateScene: boolean = false) {
+        this.image.update()
         if (this.image.body == undefined) return
             // Derive position from physics
              

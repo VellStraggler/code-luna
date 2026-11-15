@@ -17,37 +17,22 @@ export default class LaserShot {
     readonly speed: number = LASER_SPEED
     timeleft:number = LASER_LIFE //seconds
 
-    constructor(scene: MainScene, fromObj: IGameFighter, pos: XY)
-    constructor(scene: MainScene, fromObj: IGameFighter, pos: XY, enemies: IGameFighter[])
-    constructor(scene: MainScene, fromObj: IGameFighter, enemies: IGameFighter[])
-    constructor(scene: MainScene, fromObj: IGameFighter, enemy: IGameFighter)
     constructor(
         scene: MainScene,
-        fromObj: IGameFighter,
-        arg3: XY | IGameFighter[] | IGameFighter,
-        arg4?: IGameFighter[]
+        shooter: IGameFighter,
+        enemies: IGameFighter[],
+        toPoint?: XY
     ) {
-        var enemies: IGameFighter[] = []
         var pos:XY
 
         // Enemy list only: Shoot at random
-        if (Array.isArray(arg3)) {
-            enemies = arg3
+        if (toPoint == null) {
             pos = enemies[Math.floor(Math.random() * enemies.length)].getPosition()
-        } else if (arg3 instanceof HPImage || arg3 instanceof ModularRobot) {
-            enemies.push(arg3)
-            pos = arg3.getPosition()
-        } else if (arg3 instanceof XY) { // position only, robots as enemies
-            pos = arg3
-            enemies = scene.robots.robots
         } else {
-            throw Error("Bad argument for arg3. XY or a single/list of IGameFighter interface")
-        }
-        if (arg4) {
-            enemies = arg4
+            pos = toPoint
         }
 
-        let fromPos = fromObj.getPosition()
+        let fromPos = shooter.getPosition()
         this.vec = fromPos.getDirVector(pos)
         this.id = generateId()
         // place it at the from-Object
@@ -60,16 +45,16 @@ export default class LaserShot {
         body.setCircle(2, -1)
         body.setVelocity(this.vec.x * this.speed, this.vec.y * this.speed)
 
-        for(const toObj of enemies) {
-            for(let i = 0; i < (toObj.getHitboxes().length); i++) {
-                const hitbox = toObj.getHitboxes()[i]
+        for(const enemy of enemies) {
+            for(let i = 0; i < (enemy.getHitboxes().length); i++) {
+                const hitbox = enemy.getHitboxes()[i]
                 scene.physics.add.collider(this.image, hitbox, () => {
                     hitbox.setBounce(1)
                     try {
-                        let toObjR = toObj as ModularRobot
-                        toObj.takeDamage(10, toObjR.blocks[i])
+                        let toObjR = enemy as ModularRobot
+                        enemy.takeDamage(10, toObjR.blocks[i])
                     } catch {
-                        toObj.takeDamage(10, toObj)
+                        enemy.takeDamage(10, enemy)
                     }
                     body.setVelocity(0,0)
                     this.dead = true
@@ -80,7 +65,7 @@ export default class LaserShot {
             this.dead = true
         })
 
-        scene.laserSound.play()
+        scene.sound.play("laser")
         scene.lasers.push(this)
         this.update(0)
     }

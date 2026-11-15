@@ -71,6 +71,10 @@ export default class HPImage extends Phaser.Physics.Arcade.Image implements IGam
         }
     }
 
+    getHitboxes(): HPImage[] {
+        return [this]
+    }
+
     barVisible(isVisible: boolean = true) {
         this.hpBarBG.setVisible(isVisible)
         this.hpBar.setVisible(isVisible)
@@ -114,9 +118,6 @@ export default class HPImage extends Phaser.Physics.Arcade.Image implements IGam
     getHP() {
         return this.hp
     }
-    getHitboxes(): Phaser.Physics.Arcade.Image[] {
-        return [this]
-    }
 
     takeDamage(amt:number) {
         if(!this.visible) {
@@ -148,19 +149,19 @@ export default class HPImage extends Phaser.Physics.Arcade.Image implements IGam
     override setVelocity(x:number, y:number | undefined) {
         super.setVelocity(x,y)
         if (y == undefined) y = x
-        this.updateHPBar(x,y)
         for (const bar of [this.hpBarBG, this.hpBar]) {
             let body = bar.body as Phaser.Physics.Arcade.Body
             body?.setVelocity(x,y)
         }
         this.shadow?.setVelocity(x,y)
         this.updateShadow()
+        this.updateHPBar()
         return this
     }
     override setPosition(x:number, y:number) {
         super.setPosition(x,y)
         this.updateShadow()
-        this.updateHPBar(x,y)
+        this.updateHPBar()
         return this
     }
 
@@ -170,9 +171,9 @@ export default class HPImage extends Phaser.Physics.Arcade.Image implements IGam
         return this
     }
 
-    updateHPBar(x:number, y:number) {
-        this.hpBarBG?.setPosition(this.x,this.y-HP_Y_OFFSET)
-        this.hpBar?.setPosition(this.x-HP_X_OFFSET,this.y-HP_Y_OFFSET-HP_HALF_HEIGHT)
+    updateHPBar() {
+        this.hpBarBG?.setPosition(this.x, this.y-HP_Y_OFFSET)
+        this.hpBar?.setPosition(this.x-HP_X_OFFSET, this.y-HP_Y_OFFSET-HP_HALF_HEIGHT)
     }
 
     override setScale(amt: number) {

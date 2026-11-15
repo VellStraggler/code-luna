@@ -59,12 +59,10 @@ export default class MainScene extends Phaser.Scene {
         this.load.audio("pain", audioPre + "pain.mp3")
         this.load.audio("drilling", audioPre + "drilling.wav", {loop: true, volume: 0.5})
         this.load.audio("weld", audioPre + "weld.mp3")
-        this.laserSound = new Audio(prefix + "audio/laser.wav")
         this.painSound = new Audio(prefix + "audio/pain.mp3")
     }
 
     create() {
-
         this.input.setTopOnly(true)
         /// CAMERA ///
         const camera = this.cameras.main
@@ -163,7 +161,6 @@ export default class MainScene extends Phaser.Scene {
         const distance = GAME_SPEED * (delta / 1000)
 
         if(_time > this.prevShotTime + LASER_TEST_MS) {
-            // this.debug_shootAllLasers()
             this.prevShotTime = _time
         }
 
@@ -223,31 +220,28 @@ export default class MainScene extends Phaser.Scene {
     public async debug_shootAllLasers() {
         for (const robot of this.robots) {
             if (robot.canShoot()) {
-                robot.shootLaser()
                 this.shootAtObject(robot, this.player)
             }
         }
     }
 
-    public async shootAtObject(fromObj: IGameFighter, toObj: IGameFighter) {
-        fromObj.aim(toObj.getPosition())
-        const use = fromObj.shootLaser()
+    public async shootAtObject(shooter: IGameFighter, target: IGameFighter) {
+        shooter.aim(target.getPosition())
+        const use = shooter.shootLaser()
         if (use > 0) {
-            new LaserShot(this, fromObj, toObj)
-            this.mainStats.drainGas(use)
+            new LaserShot(this, shooter, [target])
+            // this.mainStats.drainGas(use)
         }
     }
 
-    public async shootAtMousePosition(fromObj: HPImage, position: Phaser.Input.Pointer) {
+    public async shootAtMousePosition(fromObj: IGameFighter, position: Phaser.Input.Pointer) {
         this.shootAtPosition(fromObj, xy(position.worldX, position.worldY))
     }
 
-    public async shootAtPosition(fromObj: HPImage, xy:XY) {
-        console.log("Before:",this.mainStats.getGas())
+    public async shootAtPosition(fromObj: IGameFighter, xy:XY) {
         const use = fromObj.shootLaser()
         if (use > 0) {
-            new LaserShot(this, fromObj, xy)
-            console.log("Shot:", this.mainStats.getGas())
+            new LaserShot(this, fromObj, this.robots.robots, xy)
         }
     }
 
