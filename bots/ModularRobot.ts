@@ -61,22 +61,25 @@ export default class ModularRobot implements IGameFighter{
     canSend = false; canReceive = false;
 
     /* use create(...) or createFromBlock(...) instead **/
-    private constructor(scene: MainScene, position: XY, startingBlockType: BlockType = BlockType.sleek) {
+    private constructor(scene: MainScene, position: XY) {
         this.scene = scene
         this.id = generateId();
         this.position = position
         this.lastPos = position
-        this.addBlock(BlockBuilder.new(scene, xy(), startingBlockType, this))
-            .addEnemyCollider(scene.player)
     }
 
     static create(scene: MainScene, x: number, y: number, blocktype: BlockType = BlockType.sleek) {
-        let newRobot = new this(scene, xy(x,y), blocktype)
+        let newRobot = new this(scene, xy(x,y))
+        newRobot.addBlock(BlockBuilder.new(scene, xy(), blocktype, newRobot))
+        newRobot.addEnemyCollider(scene.player)
         return newRobot
     }
 
     static createFromBlock(scene: MainScene, sourceBlock: ModularBlock) {
-        let newRobot = new this(scene, sourceBlock.globalPos, sourceBlock.blockType)
+        let newRobot = new this(scene, sourceBlock.globalPos)
+        newRobot.blocks.push(sourceBlock)
+        newRobot.reload()
+        newRobot.addEnemyCollider(scene.player)
         return newRobot
     }
     
@@ -113,7 +116,6 @@ export default class ModularRobot implements IGameFighter{
                 } else {
                     this.remove(block)
                     block.disconnect(this.scene, this.scene.robots, this)
-                    // block.resetHP()
                 }
                 this.reload()
             }
@@ -493,7 +495,7 @@ export default class ModularRobot implements IGameFighter{
         )
 
         for (const block of this.blocks) {
-            let newBlock = new ModularBlock(this.scene, pos.add(block.localPos), block.blockType, newRobot)
+            let newBlock = BlockBuilder.new(this.scene, block.localPos, block.blockType, newRobot)
             for (const part of block.modularParts) {
                 newBlock.addPart(this.scene, part.partType, newRobot)
             }
@@ -502,7 +504,7 @@ export default class ModularRobot implements IGameFighter{
         for (const other of this.scene.robots) {
             this.scene.physics.add.collider(other.blocks[0].image, newRobot.blocks[0].image)
         }
-        return newRobot
+        return newRobot.reload()
     }
 
     /** Takes the block's position and rounds it to our robot's block grid */

@@ -145,6 +145,12 @@ export default class ModularBlock extends BaseGameItem {
         })
     }
 
+    override destroy() {
+        this.modularParts.forEach(part => part.destroy())
+        this.modularParts = []
+        super.destroy()
+    }
+
     /** 
      * Recognizes when it becomes a parent block and sets its own global position. Otherwise 
      * update based on the global position.

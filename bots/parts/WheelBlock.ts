@@ -27,22 +27,23 @@ export default class WheelBlock extends ModularBlock {
         let y = this.globalPos.y
         
         this.chassisImage = this.scene.physics.add.image(x, y, WHEEL_CHASSIS_NAME)
-        .setBodySize(BLOCK_RES-2, BLOCK_RES-2, true)
-        .setDepth(BLOCK_DEPTH + 50)
+            .setBodySize(BLOCK_RES-2, BLOCK_RES-2, true)
+            .setDepth(BLOCK_DEPTH + 50)
         this.scene.uiCamera.ignore(this.chassisImage)
         this.scene.baseLayer.push(this.chassisImage)
         this.rotateChassis(dir)
     }
 
     public override disconnect(scene: MainScene, robots: ModularRobots) {
+        super.disconnect(scene, robots)
+        this.robot.wheels = this.robot.wheels.filter(wheel => wheel != this)
         this.chassisImage?.destroy()
         this.chassisImage = null
-        this.robot.wheels = this.robot.wheels.filter(wheel => wheel != this)
-        super.disconnect(scene, robots)
     }
 
     public override destroy() {
         this.disconnect(this.scene, this.scene.robots)
+        super.destroy()
     }
     
     public override rotateChassis(dir: Dirs): void {
