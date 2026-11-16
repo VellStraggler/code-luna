@@ -36,41 +36,41 @@ export class XY {
         return this.x.toString() + ", " + this.y.toString()
     }
 
-    add(amt:XY | number) {
+    add(offset: XY | number) {
         let x = this.x
         let y = this.y
-        if (typeof amt === 'number') {
-            x += amt
-            y += amt
+        if (typeof offset === 'number') {
+            x += offset
+            y += offset
         } else {
-            x += amt.x
-            y += amt.y
+            x += offset.x
+            y += offset.y
         }
         return xy(x,y)
     }
 
-    subtract(amt:XY | number) {
+    subtract(offset: XY | number) {
         let x = this.x
         let y = this.y
-        if (typeof amt === 'number') {
-            x -= amt
-            y -= amt
+        if (typeof offset === 'number') {
+            x -= offset
+            y -= offset
         } else {
-            x -= amt.x
-            y -= amt.y
+            x -= offset.x
+            y -= offset.y
         }
         return xy(x,y)
     }
 
-    multiply(amt: XY | number) {
+    multiply(factor: XY | number) {
         let x = this.x
         let y = this.y
-        if (typeof amt === 'number') {
-            x *= amt
-            y *= amt
+        if (typeof factor === 'number') {
+            x *= factor
+            y *= factor
         } else {
-            x *= amt.x
-            y *= amt.y
+            x *= factor.x
+            y *= factor.y
         }
         return xy(x,y)
     }
@@ -81,7 +81,4 @@ export class XY {
 }
 export function xy(x:number =0, y:number =0) {
     return new XY(x,y)
-}
-export default function pos(x:number=0,y:number=0) {
-    return xy(x,y)
 }

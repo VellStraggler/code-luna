@@ -2,8 +2,8 @@ import { BATTERY_SIZE, BLOCK_RES, BLOCK_WHEEL_NAME, ENERGY_MS_PER_WHEEL, FACTORY
 import ModularBlock from "./parts/ModularBlock";
 import { ModularPart } from "./parts/ModularPart";
 import { xy, XY } from "../main/xy";
-import { BlockType } from "./parts/BlockType";
-import { PartType } from "./parts/PartType";
+import { BlockDefinition } from "./parts/BlockDefinition";
+import { PartDefinition } from "./parts/PartDefinition";
 import HPImage from "../main/HPImage";
 import MainScene from "../CodeLuna";
 import IGameFighter from "./contracts/IGameFighter";
@@ -11,7 +11,7 @@ import * as Phaser from 'phaser'
 import CpuPart from "./parts/CpuPart";
 import BlockBuilder from "./parts/builderClasses";
 import WheelBlock from "./parts/WheelBlock";
-import Logic from "../main/logic";
+import GameGeometry from "../main/GameGeometry";
 
 /**
  * Holds larger robot data, such as the supposed source block,
@@ -29,6 +29,7 @@ export default class ModularRobot implements IGameFighter{
 
     public latestCpuPart: CpuPart | null = null
     public latestDrillPart: ModularPart | null = null
+    public isDrilling = false
     public guns: ModularPart[] = []
     public wheels: WheelBlock[] = []
     private miningOverlaps: Phaser.Physics.Arcade.Collider[] = []
@@ -37,7 +38,7 @@ export default class ModularRobot implements IGameFighter{
 
     goal: XY | null = null
     
-    /** assetName: count, for quick evaluation of abilities */
+    /** assetKey: count, for quick evaluation of abilities */
     private objectCounts: {[key:string]: number} = {}
     private weight = 0;
     private gasCost = 0;
@@ -77,7 +78,7 @@ export default class ModularRobot implements IGameFighter{
         this.lastPos = position
     }
 
-    static create(scene: MainScene, x: number, y: number, blocktype: BlockType = BlockType.sleek) {
+    static create(scene: MainScene, x: number, y: number, blocktype: BlockDefinition = BlockDefinition.sleek) {
         let newRobot = new this(scene, xy(x,y))
         newRobot.addBlock(BlockBuilder.new(scene, xy(), blocktype, newRobot))
         newRobot.storedCosmorite = newRobot.baseEnergyNeed
@@ -143,10 +144,10 @@ export default class ModularRobot implements IGameFighter{
     }
 
     /** A broken block detaches, and any disconnected groups become separate robots. */
-    takeDamage(amt: number, target: any) {
+    takeDamage(damageAmount: number, target: any) {
         const block = target as ModularBlock
         if (!this.blocks.includes(block)) return
-        block.hp = Math.max(0, block.hp - amt)
+        block.hp = Math.max(0, block.hp - damageAmount)
         block.updateDamageTint()
         if (block.hp > 0) return
 
@@ -265,40 +266,41 @@ export default class ModularRobot implements IGameFighter{
     }
 
     shootLaser() {
-        if (this.canShoot()) {
-            this.guns.forEach(gun => gun.activate())
-        }
+        if (!this.canShoot()) return 0
+
+        this.useEnergy(LASER_ENERGY_USE)
+        this.guns.forEach(gun => gun.activate())
         this.guns.forEach(gun => gun.deactivate())
-        return 1
+        return LASER_ENERGY_USE
     }
 
-    useEnergy(amt: number) {
-        this.storedCosmorite -= amt
+    useEnergy(energyAmount: number) {
+        this.storedCosmorite -= energyAmount
         if (this.storedCosmorite < 0) {
             this.storedCosmorite = 0
         }
     }
 
     getCalculatedEnergyUse(assumeMoving: boolean = false) {
-        let use = this.latestDrillPart?.getEnergyUse() ?? 0
-        use += this.guns[0]?.getEnergyUse() ?? 0 * this.guns.length
+        let energyUsePerMs = this.latestDrillPart?.getEnergyUse() ?? 0
+        energyUsePerMs += this.guns[0]?.getEnergyUse() ?? 0 * this.guns.length
         for (const wheel of this.wheels) {
-            use += assumeMoving ? ENERGY_MS_PER_WHEEL : wheel.getEnergyUse()
+            energyUsePerMs += assumeMoving ? ENERGY_MS_PER_WHEEL : wheel.getEnergyUse()
         }
-        return use
+        return energyUsePerMs
     }
 
     /** Based on objectCounts, which goes off of object names */
     private evaluateAbilities() {
         for(const [name, count] of Object.entries(this.objectCounts)) {
             if(name.includes('block')) {
-                let blockType = BlockType.get(name)
+                let blockType = BlockDefinition.fromAssetKey(name)
                 this.weight += blockType.weight * count
                 this.storageSpace += blockType.storage * count
                 this.gasCost += blockType.gasCost * count
                 this.stoneCost += blockType.stoneCost * count
             } else { //part
-                let partType = PartType.get(name)
+                let partType = PartDefinition.fromAssetKey(name)
                 this.weight += partType.weight * count
                 this.gasCost += partType.gasCost * count
                 this.stoneCost += partType.stoneCost * count
@@ -389,7 +391,7 @@ export default class ModularRobot implements IGameFighter{
     public getCpuPart(): CpuPart | null {
         if (this.latestCpuPart == null) {
             for (const part of this.parts) {
-                if (part.partType.assetName == PART_CPU_NAME) {
+                if (part.partType.assetKey == PART_CPU_NAME) {
                     this.latestCpuPart = part as CpuPart
                 }
             }
@@ -408,22 +410,22 @@ export default class ModularRobot implements IGameFighter{
      * Collects all childIds and all blocks for allBlocks and objectCounts*/
     private recordBlockData() {
         for (const block of this.blocks) {
-            this.addToObjectCounts(block.itemName)
+            this.addToObjectCounts(block.assetKey)
             this.registerBlock(block)
 
             //add to totals
             for (const part of block.modularParts) {
                 this.registerPart(part)
-                this.addToObjectCounts(part.itemName)
+                this.addToObjectCounts(part.assetKey)
             }
             
             // getting chassis rotation:
             for (const wheel of this.wheels) {
                 for(const block of this.blocks) {
-                    if (block.itemName == BLOCK_WHEEL_NAME) continue
+                    if (block.assetKey == BLOCK_WHEEL_NAME) continue
                     let diff = wheel.localPos.subtract(block.localPos)
                     if(Math.abs(diff.x) + Math.abs(diff.y) == BLOCK_RES) {
-                        const dir = Logic.getDir(block.localPos, wheel.localPos)
+                        const dir = GameGeometry.directionBetween(block.localPos, wheel.localPos)
                         wheel.rotateChassis(dir)
                     }
                 }
@@ -433,7 +435,7 @@ export default class ModularRobot implements IGameFighter{
 
     registerPart(part: ModularPart) {
         this.parts.push(part)
-        switch (part.itemName) {
+        switch (part.assetKey) {
             case PART_DRILL_NAME:
                 this.allowMining(this.scene.cosmoriteOre, part)
                 break
@@ -455,7 +457,7 @@ export default class ModularRobot implements IGameFighter{
     }
 
     registerBlock(block: ModularBlock) {
-        switch (block.itemName) {
+        switch (block.assetKey) {
             case BLOCK_WHEEL_NAME:
                 this.wheels.push(block as WheelBlock)
                 break
@@ -478,8 +480,14 @@ export default class ModularRobot implements IGameFighter{
 
 
         if(this.proxyGlobalBlock != null) {
-            if(this.proxyGlobalBlock.image.body == undefined) return // this guy is in fact dead
-            if (this.getHP() <= 0) return
+            if(this.proxyGlobalBlock.image.body == undefined) {
+                this.stopDrilling()
+                return // this guy is in fact dead
+            }
+            if (this.getHP() <= 0) {
+                this.stopDrilling()
+                return
+            }
         }
         let proxy = this.proxyGlobalBlock
 
@@ -515,8 +523,8 @@ export default class ModularRobot implements IGameFighter{
 
         this.moveToGoal(delta)
 
-        let use = this.getCalculatedEnergyUse()
-        this.useEnergy((use * delta) / 1000)
+        const energyUsePerMs = this.getCalculatedEnergyUse()
+        this.useEnergy((energyUsePerMs * delta) / 1000)
     }
 
     moveToGoal(delta: number) {
@@ -552,11 +560,11 @@ export default class ModularRobot implements IGameFighter{
         return this.blocks[this.blocks.length-1]
     }
 
-    public addPart(partType: PartType) {
+    public addPart(partType: PartDefinition) {
         this.getLastBlock()?.addPart(this.scene, partType, this)
         return this
     }
-    public addBlockType(blockType: BlockType, x: number = 0, y: number = 0) {
+    public addBlockType(blockType: BlockDefinition, x: number = 0, y: number = 0) {
         const offset = xy(x*BLOCK_RES,y*BLOCK_RES)
         this.addBlock(BlockBuilder.new(this.scene, offset, blockType, this))
         return this
@@ -568,15 +576,13 @@ export default class ModularRobot implements IGameFighter{
 
     public mine(delta:number) {
         if (this.canMine()) {
-            let amt = (MINING_RATE_MS * delta)/1000
-            if(this.storageSpace >= this.storedLunestone + this.storedCosmorite + amt) {
+            const minedAmount = (MINING_RATE_MS * delta)/1000
+            if(this.storageSpace >= this.storedLunestone + this.storedCosmorite + minedAmount) {
                 this.latestDrillPart?.activate()
-                this.storedCosmorite += amt * GAS_MINE_RATE
-                this.storedLunestone += amt * STONE_MINE_RATE
-                this.isMiningThis?.takeDamage(amt)
-                if (!this.scene.sound.isPlaying("drilling")) {
-                    this.scene.sound.play("drilling")
-                }
+                this.storedCosmorite += minedAmount * GAS_MINE_RATE
+                this.storedLunestone += minedAmount * STONE_MINE_RATE
+                this.isMiningThis?.takeDamage(minedAmount)
+                this.isDrilling = true
             } else {
                 this.stopDrilling()
             }
@@ -587,18 +593,18 @@ export default class ModularRobot implements IGameFighter{
     }
 
     private stopDrilling() {
-        this.scene.sound.stopByKey("drilling")
+        this.isDrilling = false
         this.latestDrillPart?.deactivate()
     }
 
     /** Deep copy a robot. */
     public deepCopy(newX: number | null = null, newY: number | null = null) {
-        const pos = this.getPosition()
+        const sourcePosition = this.getPosition()
 
         const newRobot = ModularRobot.create(
             this.scene,
-            newX ?? pos.x,
-            newY ?? pos.y
+            newX ?? sourcePosition.x,
+            newY ?? sourcePosition.y
         )
 
         for (const block of this.blocks) {
@@ -655,12 +661,12 @@ export default class ModularRobot implements IGameFighter{
         return this
     }
     
-    public setGoal(pos: XY) {
-        this.goal = pos
+    public setGoal(goalPosition: XY) {
+        this.goal = goalPosition
         this.timeIdle = 0
     }
     
-    private stepToPosition(pos: XY) {
+    private stepToPosition(targetPosition: XY) {
         if (this.storedCosmorite != 0) {
 
             this.wheels.forEach((wheel) => wheel.activate())
@@ -668,8 +674,8 @@ export default class ModularRobot implements IGameFighter{
             let angle = Phaser.Math.Angle.Between(
                 this.position.x,
                 this.position.y,
-                pos.x,
-                pos.y
+                targetPosition.x,
+                targetPosition.y
             )
 
             this.blocks.forEach(block => {

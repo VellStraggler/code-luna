@@ -3,27 +3,27 @@
 import * as Phaser from 'phaser'
 import MainStats from "./main/MainStats"
 import Player, { PlayerState } from "./main/Player"
-import Base from "./main/Base"
+import PlayerBase from "./main/PlayerBase"
 import GUI from "./main/gui"
 import HPImage from './main/HPImage'
 import { BASIC_ASSET_NAMES, WINDOW, BLOCK_RES, LASER_TEST_MS, FRAME_TIME_MS, BASE_POS, GAME_SPEED, REFINEMENT_RATE_MS, MINING_RATE_MS, COSMORITE_ORE, TWO_FRAME_ASSETS, F1, F0, BLOCK_DEPTH, FACTORY_BLOCK } from './main/constants'
 import IGameFighter from './bots/contracts/IGameFighter'
-import pos, { XY, xy } from './main/xy'
+import { XY, xy } from './main/xy'
 import LaserShot from './bots/LaserShot'
 import Controls from './main/Controls'
 import ModularRobots from './bots/ModularRobots'
-import Logic from './main/logic'
+import GameGeometry from './main/GameGeometry'
 import ModularRobot from './bots/ModularRobot'
-import { BlockType } from './bots/parts/BlockType'
+import { BlockDefinition } from './bots/parts/BlockDefinition'
 import ModularBlock from './bots/parts/ModularBlock'
-import { PartType } from './bots/parts/PartType'
+import { PartDefinition } from './bots/parts/PartDefinition'
 
 export default class MainScene extends Phaser.Scene {
     public player!: Player
     private ground!: Phaser.GameObjects.TileSprite
     public robots!: ModularRobots
     public lasers: LaserShot[] = []
-    public base!: Base
+    public playerBase!: PlayerBase
     public cosmoriteOre!: HPImage
     public mainStats!: MainStats
     public GUI!: GUI
@@ -39,7 +39,7 @@ export default class MainScene extends Phaser.Scene {
 
     laserSound!: HTMLAudioElement
     painSound!: HTMLAudioElement
-    drillSound!: HTMLAudioElement
+    drillSound!: Phaser.Sound.BaseSound
 
     constructor() {
         super('MainScene')
@@ -65,6 +65,7 @@ export default class MainScene extends Phaser.Scene {
     }
 
     create() {
+        this.drillSound = this.sound.add("drilling", { loop: true, volume: 0.5 })
         this.input.setTopOnly(true)
         /// CAMERA ///
         const camera = this.cameras.main
@@ -152,15 +153,13 @@ export default class MainScene extends Phaser.Scene {
     }
 
     createBase(x:number, y:number) {
-        this.base = new Base(this, x, y)
-        this.physics.add.overlap(this.player, this.base, () => {
-            this.base.isOverlapped = true
+        this.playerBase = new PlayerBase(this, x, y)
+        this.physics.add.overlap(this.player, this.playerBase, () => {
+            this.playerBase.isOverlapped = true
         })
     }
     
     update(_time: number, delta: number) {
-        const distance = GAME_SPEED * (delta / 1000)
-
         if(_time > this.prevShotTime + LASER_TEST_MS) {
             this.prevShotTime = _time
         }
@@ -170,7 +169,7 @@ export default class MainScene extends Phaser.Scene {
             this.prevFrameTime = _time
         }
         
-        this.controls.updateMovement(distance)
+        this.controls.updateMovement(GAME_SPEED)
 
         if (this.controls.spaceJustDown()) {
             this.debug_shootAllLasers()
@@ -188,19 +187,19 @@ export default class MainScene extends Phaser.Scene {
                 this.cosmoriteOre.randomTeleport(800)
                 this.cosmoriteOre.respawn()
             } else {
-                let amt = (MINING_RATE_MS * delta)/1000
-                this.mainStats.incCosmorite(amt)
-                this.cosmoriteOre.takeDamage(amt/10)
+                const minedAmount = (MINING_RATE_MS * delta)/1000
+                this.mainStats.incCosmorite(minedAmount)
+                this.cosmoriteOre.takeDamage(minedAmount/10)
             }
             this.cosmoriteOre.isOverlapped = false
         }
 
         /// BASE GUI ///
-        if(this.base.isOverlapped) {
+        if(this.playerBase.isOverlapped) {
             this.player.setVisible(false)
             this.GUI.toggleBaseGUI(true)
 
-            this.base.isOverlapped = false
+            this.playerBase.isOverlapped = false
         } else {
             this.GUI.toggleBaseGUI(false)
             this.player.setVisible(true)
@@ -213,6 +212,13 @@ export default class MainScene extends Phaser.Scene {
         for(const robotI of this.robots) {
             robotI.update(delta)
             robotI.aim(this.player.getPosition())
+        }
+
+        const isAnyRobotDrilling = this.robots.robots.some(robot => robot.isDrilling)
+        if (isAnyRobotDrilling && !this.drillSound.isPlaying) {
+            this.drillSound.play()
+        } else if (!isAnyRobotDrilling && this.drillSound.isPlaying) {
+            this.drillSound.stop()
         }
 
         this.animateScene = false
@@ -228,46 +234,55 @@ export default class MainScene extends Phaser.Scene {
 
     public async shootAtObject(shooter: IGameFighter, target: IGameFighter) {
         shooter.aim(target.getPosition())
-        const use = shooter.shootLaser()
-        if (use > 0) {
-            new LaserShot(this, shooter, [target])
-            // this.mainStats.drainGas(use)
+        const energyCost = shooter.shootLaser()
+        if (energyCost > 0) {
+            if (shooter instanceof ModularRobot) {
+                for (const gun of shooter.guns) {
+                    new LaserShot(this, shooter, [target], undefined, gun.image.getPosition())
+                }
+            } else {
+                new LaserShot(this, shooter, [target])
+            }
+            // this.mainStats.drainGas(energyCost)
         }
     }
 
-    public async shootAtMousePosition(fromObj: IGameFighter, position: Phaser.Input.Pointer) {
-        this.shootAtPosition(fromObj, xy(position.worldX, position.worldY))
+    public async shootAtMousePosition(shooter: IGameFighter, pointer: Phaser.Input.Pointer) {
+        this.shootAtPosition(shooter, xy(pointer.worldX, pointer.worldY))
     }
 
-    public async shootAtPosition(fromObj: IGameFighter, xy:XY) {
-        const use = fromObj.shootLaser()
-        if (use > 0) {
-            new LaserShot(this, fromObj, this.robots.robots, xy)
+    public async shootAtPosition(shooter: IGameFighter, targetPosition: XY) {
+        const energyCost = shooter.shootLaser()
+        if (energyCost > 0) {
+            new LaserShot(this, shooter, this.robots.robots, targetPosition)
         }
     }
 
-    public async weldAtMousePosition(fromObj: HPImage, position: Phaser.Input.Pointer) {
+    public async weldAtMousePosition(sourceImage: HPImage, pointer: Phaser.Input.Pointer) {
         // ensure they are both close enough to position
-        console.log(fromObj.getPosition() + " as player, clicked at: " + position.worldX + ", " + position.worldY)
-        let dist = Logic.getDistFromClick(fromObj, position)
-        if (dist > BLOCK_RES * 6) return
+        console.log(sourceImage.getPosition() + " as player, clicked at: " + pointer.worldX + ", " + pointer.worldY)
+        const distanceFromPlayer = GameGeometry.distanceFromPointer(sourceImage, pointer)
+        if (distanceFromPlayer > BLOCK_RES * 6) return
         // find 2 nearest robots and the nearest blocks within them
         let nearestBlocks: ModularBlock[] = []
         for (const robot of this.robots) {
             let nearestBlock: ModularBlock | null = null
-            let nearestDist = BLOCK_RES * 2
+            let nearestDistance = BLOCK_RES * 2
             for (const block of robot.blocks) {
-                let dist = Logic.getDist(block.image.getPosition(), xy(position.worldX, position.worldY))
-                if (dist < nearestDist) {
+                const distanceToClick = GameGeometry.distanceBetween(
+                    block.image.getPosition(), xy(pointer.worldX, pointer.worldY)
+                )
+                if (distanceToClick < nearestDistance) {
                     nearestBlock = block
-                    nearestDist = dist
+                    nearestDistance = distanceToClick
                 }
             }
             if (nearestBlock) nearestBlocks.push(nearestBlock)
         }
-        const click = xy(position.worldX, position.worldY)
+        const clickPosition = xy(pointer.worldX, pointer.worldY)
         nearestBlocks.sort((a, b) =>
-            Logic.getDist(a.image.getPosition(), click) - Logic.getDist(b.image.getPosition(), click))
+            GameGeometry.distanceBetween(a.image.getPosition(), clickPosition)
+                - GameGeometry.distanceBetween(b.image.getPosition(), clickPosition))
         // Weld nearby robots, or repair a directly clicked block on a lone robot.
         if (nearestBlocks.length >= 2) {
             let blockA = nearestBlocks[0]
@@ -277,22 +292,22 @@ export default class MainScene extends Phaser.Scene {
             }
         } else if (nearestBlocks.length == 1) {
             const block = nearestBlocks[0]
-            if (block.hp < block.maxHP && block.image.getBounds().contains(click.x, click.y)) {
+            if (block.hp < block.maxHP && block.image.getBounds().contains(clickPosition.x, clickPosition.y)) {
                 block.resetHP()
                 this.sound.play("weld")
             }
         }
     }
 
-    public debug_summonBlock(fromObj: HPImage, position: Phaser.Input.Pointer) {
-        let dist = Logic.getDistFromClick(fromObj, position)
-        if (dist > BLOCK_RES * 6) return
+    public debug_summonBlock(sourceImage: HPImage, pointer: Phaser.Input.Pointer) {
+        const distanceFromPlayer = GameGeometry.distanceFromPointer(sourceImage, pointer)
+        if (distanceFromPlayer > BLOCK_RES * 6) return
         if (this.mainStats.getLunestone() >= 1) {
             this.mainStats.incLunestone(-1)
-            let roundx = Math.round(position.worldX/BLOCK_RES) * BLOCK_RES
-            let roundy = Math.round(position.worldY/BLOCK_RES) * BLOCK_RES
-            this.robots.push(ModularRobot.create(this, roundx, roundy)
-                .addPart(PartType.partCpu)
+            const x = Math.round(pointer.worldX/BLOCK_RES) * BLOCK_RES
+            const y = Math.round(pointer.worldY/BLOCK_RES) * BLOCK_RES
+            this.robots.push(ModularRobot.create(this, x, y)
+                .addPart(PartDefinition.partCpu)
                 .addEnemyCollider(this.player))
         }
     }

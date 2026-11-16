@@ -2,17 +2,16 @@ import MainScene from "../../CodeLuna";
 import { PART_CPU_NAME } from "../../main/constants";
 import { XY } from "../../main/xy";
 import ModularRobot from "../ModularRobot";
-import { BlockType } from "./BlockType";
+import { BlockDefinition } from "./BlockDefinition";
 import CpuPart from "./CpuPart";
 import ModularBlock from "./ModularBlock";
 import { ModularPart } from "./ModularPart";
-import { PartType } from "./PartType";
 import WheelBlock from "./WheelBlock";
 
 export default class BlockBuilder {
-    public static new(scene: MainScene, offset:XY, blockType: BlockType, robot: ModularRobot): ModularBlock {
+    public static new(scene: MainScene, offset:XY, blockType: BlockDefinition, robot: ModularRobot): ModularBlock {
         switch (blockType) {
-            case (BlockType.wheel):
+            case (BlockDefinition.wheel):
                 return new WheelBlock(scene, offset,
                     robot)
             default:

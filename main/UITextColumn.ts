@@ -1,6 +1,6 @@
 import MainScene from "../CodeLuna";
 import { TEXT_SPACING, TOOLBOX_SPACING, TOOLBOX_WIDTH } from "./constants";
-import Logic from "./logic";
+import GameGeometry from "./GameGeometry";
 import { PlayerState } from "./Player";
 import UIStatLine, { UIIconButton, UIIconStatLine, UIStatButtonLine, UITextButtonLine, UITextLine } from "./StatMessage";
 
@@ -34,7 +34,7 @@ export default class UIColumn {
 
         if (width != 0 && height != 0 && backgroundColor != null) {
             console.log("Creating background")
-            let origin = Logic.parseOrigin(align)
+            let origin = GameGeometry.originForAlignment(align)
             this.backgroundRect = scene.add.rectangle(x, y, width, height, backgroundColor)
                 .setVisible(this.isVisible)
                 .setOrigin(origin.x, origin.y)

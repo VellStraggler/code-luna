@@ -123,7 +123,7 @@ export default class GUI {
 
         // Closing may show the nearby prompt again, but must not reopen the monitor.
         if (cpu.guiState == GuiState.open) {
-            if (cpu.getDistToPlayer() >= 50) cpu.guiState = GuiState.closed
+            if (cpu.getDistanceToPlayer() >= 50) cpu.guiState = GuiState.closed
         } else {
             cpu.guiState = cpu.isNearPlayer() ? GuiState.notifying : GuiState.closed
         }
@@ -201,7 +201,7 @@ export default class GUI {
             .addStatLine("seconds left: ", () => this.robotOfCPU?.calcTimeLeft())
             .addStatLine("Estimated range (m): ", () => this.robotOfCPU?.getMeterRange())
             .addButtonLine("sendToMine", () => this.robotOfCPU?.setGoal(this.scene.debug_getMineSiteXY()))
-            .addButtonLine("sendHome", () => this.robotOfCPU?.setGoal(this.scene.base.getPosition()))
+            .addButtonLine("sendHome", () => this.robotOfCPU?.setGoal(this.scene.playerBase.getPosition()))
     }
 
     private initCommandGUI() {

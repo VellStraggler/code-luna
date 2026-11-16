@@ -1,11 +1,11 @@
 import {XY, xy} from "../../main/xy"
 import { BLOCK_DEPTH, BLOCK_RES, DEFAULT_DRAG, DIRECTION_OFFSETS, Dirs, generateId, MAX_SPEED, PART_CPU_NAME } from "../../main/constants";
 import { ModularPart } from "./ModularPart";
-import { BlockType } from "./BlockType";
+import { BlockDefinition } from "./BlockDefinition";
 import MainScene from "../../CodeLuna";
 import HPImage from "../../main/HPImage";
 import ModularRobot from "../ModularRobot";
-import { PartType } from "./PartType";
+import { PartDefinition } from "./PartDefinition";
 import ModularRobots from "../ModularRobots";
 import CpuPart from "./CpuPart";
 import BaseGameItem from "../contracts/BaseGameItem";
@@ -17,7 +17,7 @@ export default class ModularBlock extends BaseGameItem {
     robot: ModularRobot
     modularParts: ModularPart[] = [];
 
-    readonly blockType: BlockType;
+    readonly blockType: BlockDefinition;
     storedCosmorite = 0
     storedLunestone = 0
     hp = 0
@@ -25,7 +25,7 @@ export default class ModularBlock extends BaseGameItem {
     constructor(
         scene: MainScene,
         offset:XY, 
-        blockType: BlockType, 
+        blockType: BlockDefinition,
         robot: ModularRobot
     ) {
         let globalPos = robot.getPosition()
@@ -36,8 +36,8 @@ export default class ModularBlock extends BaseGameItem {
         super(
             scene,
             xy(x, y),
-            new HPImage(scene, x, y, blockType.assetName),
-            blockType.assetName,
+            new HPImage(scene, x, y, blockType.assetKey),
+            blockType.assetKey,
             blockType.availableFrames -1
         )
         this.robot = robot
@@ -103,13 +103,13 @@ export default class ModularBlock extends BaseGameItem {
 
     rotateChassis(dir: Dirs) {}
 
-    addPart(scene: MainScene, partType: PartType, robot: ModularRobot | undefined = undefined):this {
+    addPart(scene: MainScene, partType: PartDefinition, robot: ModularRobot | undefined = undefined):this {
         let part!: ModularPart
-        if (partType.assetName == PART_CPU_NAME && robot instanceof ModularRobot) {
+        if (partType.assetKey == PART_CPU_NAME && robot instanceof ModularRobot) {
             part = new CpuPart(scene, this, robot)
             robot.latestCpuPart = part as CpuPart
         } else {
-            part = new ModularPart(scene, this, partType.assetName)
+            part = new ModularPart(scene, this, partType.assetKey)
         }
         this.modularParts.push(part)
         this.scene.uiCamera.ignore(part.image)
@@ -128,8 +128,8 @@ export default class ModularBlock extends BaseGameItem {
         return newRobot
     }
 
-    takeDamage(amt: number) {
-        this.robot.takeDamage(amt, this)
+    takeDamage(damageAmount: number) {
+        this.robot.takeDamage(damageAmount, this)
     }
 
     /** Strength sets the 1-damage laser hit count (minimum one).

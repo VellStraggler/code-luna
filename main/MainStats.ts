@@ -18,8 +18,8 @@ export default class MainStats {
     deltaDrainGas(delta:number) {
         this.incGas(-delta*this.energyUsePerMs);
     }
-    drainGas(amt: number) {
-        this.incGas(-amt)
+    drainGas(amount: number) {
+        this.incGas(-amount)
     }
 
     getGas() {
@@ -32,13 +32,13 @@ export default class MainStats {
         return this.cosmoriteGas;
     }
 
-    incGas(amt: number) {
-        this.cosmoriteGas = Math.max(amt + this.cosmoriteGas, 0);
+    incGas(amount: number) {
+        this.cosmoriteGas = Math.max(amount + this.cosmoriteGas, 0);
     }
-    incLunestone(amt: number) {
-        this.lunestone = Math.max(amt + this.lunestone, 0);
+    incLunestone(amount: number) {
+        this.lunestone = Math.max(amount + this.lunestone, 0);
     }
-    incCosmorite(amt: number) {
-        this.cosmoriteGas = Math.max(amt + this.cosmoriteGas, 0);
+    incCosmorite(amount: number) {
+        this.cosmoriteGas = Math.max(amount + this.cosmoriteGas, 0);
     }
 }

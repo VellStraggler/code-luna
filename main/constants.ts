@@ -1,6 +1,6 @@
 import MyColors from "./MyColors"
-import xy, { XY } from "./xy"
-/**These names are repeated in ModularRobot, BlockType, and PartType, 
+import { xy, XY } from "./xy"
+/**These names are repeated in ModularRobot, BlockDefinition, and PartDefinition,
  * so any changes to this must be made there also.  */
 export const PART_DRILL_NAME = 'part-drill'
 export const PART_GUN_NAME = 'part-gun'
@@ -44,7 +44,7 @@ export const TEXT_SPACING = 20
 export const TOOLBOX_WIDTH = 40
 export const TOOLBOX_SPACING = 8
 export const BASE_POS = xy(300,300)
-export const GAME_SPEED = 8000
+export const GAME_SPEED = 8000 / 60
 
 export const TELEPORT_RANGE = 200
 export const LASER_TEST_MS = 15000

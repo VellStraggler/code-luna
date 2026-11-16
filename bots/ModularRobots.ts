@@ -1,9 +1,9 @@
 import MainScene from "../CodeLuna"
-import Logic from "../main/logic"
+import GameGeometry from "../main/GameGeometry"
 import { xy } from "../main/xy"
-import { BlockType } from "./parts/BlockType"
+import { BlockDefinition } from "./parts/BlockDefinition"
 import ModularRobot from "./ModularRobot"
-import { PartType } from "./parts/PartType"
+import { PartDefinition } from "./parts/PartDefinition"
 import { MINING_RATE_MS } from "../main/constants"
 import ModularBlock from "./parts/ModularBlock"
 import * as Phaser from 'phaser'
@@ -47,13 +47,17 @@ export default class ModularRobots {
 
     findRobotClosestToPlayer(): ModularRobot | null {
         if (this.robots.length == 0) return null
-        let lowestDist = Logic.getDist(this.robots[0].getPosition(), this.scene.player.getPosition())
+        let closestDistance = GameGeometry.distanceBetween(
+            this.robots[0].getPosition(), this.scene.player.getPosition()
+        )
         let i = 0
         this.robots.forEach((robot, index) => {
-            let dist = Logic.getDist(robot.getPosition(), this.scene.player.getPosition())
-            if (dist < lowestDist) {
+            const distanceToPlayer = GameGeometry.distanceBetween(
+                robot.getPosition(), this.scene.player.getPosition()
+            )
+            if (distanceToPlayer < closestDistance) {
                 i = index
-                lowestDist = dist
+                closestDistance = distanceToPlayer
             }
         })
         return this.robots[i]
@@ -66,16 +70,16 @@ export default class ModularRobots {
     }
 
     debug_createRobot(): ModularRobot {
-        let robot = ModularRobot.create(this.scene, 400, 300, BlockType.sleek)
-            .addPart(PartType.partDrill)
-            .addPart(PartType.partGun)
-            .addBlockType(BlockType.storage, 1, 0)
-            .addPart(PartType.partCpu)
-            .addBlockType(BlockType.wheel, 0, 1)
-            .addBlockType(BlockType.storage, 0, -1)
-            .addBlockType(BlockType.wheel, 0, -2)
-            .addBlockType(BlockType.wheel, 1, 1)
-            .addBlockType(BlockType.wheel, 2, 0)
+        let robot = ModularRobot.create(this.scene, 400, 300, BlockDefinition.sleek)
+            .addPart(PartDefinition.partDrill)
+            .addPart(PartDefinition.partGun)
+            .addBlockType(BlockDefinition.storage, 1, 0)
+            .addPart(PartDefinition.partCpu)
+            .addBlockType(BlockDefinition.wheel, 0, 1)
+            .addBlockType(BlockDefinition.storage, 0, -1)
+            .addBlockType(BlockDefinition.wheel, 0, -2)
+            .addBlockType(BlockDefinition.wheel, 1, 1)
+            .addBlockType(BlockDefinition.wheel, 2, 0)
             .addEnemyCollider(this.scene.player)
             .reload()
         this.robots.push(robot)
@@ -86,14 +90,14 @@ export default class ModularRobots {
         for (const block of robot.blocks) {
             if (this.offloadingBlocks.has(block)) continue
             this.offloadingBlocks.add(block)
-            const collider = this.scene.physics.add.collider(this.scene.base, block.image)
-            const overlap = this.scene.physics.add.overlap(this.scene.base.zone, block.image, () => {
+            const collider = this.scene.physics.add.collider(this.scene.playerBase, block.image)
+            const overlap = this.scene.physics.add.overlap(this.scene.playerBase.zone, block.image, () => {
                 const owner = block.robot
                 if (!owner.blocks.includes(block) || this.offloadedThisStep.has(owner)) return
                 this.offloadedThisStep.add(owner)
-                const amt = MINING_RATE_MS / 100
-                const lunestone = Math.min(amt, owner.storedLunestone)
-                const cosmorite = Math.min(amt, Math.max(0, owner.storedCosmorite - owner.baseEnergyNeed))
+                const transferAmount = MINING_RATE_MS / 100
+                const lunestone = Math.min(transferAmount, owner.storedLunestone)
+                const cosmorite = Math.min(transferAmount, Math.max(0, owner.storedCosmorite - owner.baseEnergyNeed))
                 if (lunestone > 0) {
                     this.scene.mainStats.incLunestone(lunestone)
                     owner.storedLunestone -= lunestone

@@ -13,14 +13,14 @@ export default class BaseGameItem implements IGameItem {
     maxFrame: number;
     rotation: number;
     scene: MainScene
-    itemName: string
+    assetKey: string
     isActive: boolean = true
     
     constructor(
         scene: MainScene, 
         globalPos: XY,
         image: HPImage,
-        itemName: string,
+        assetKey: string,
         maxFrames: number
     ) {
         this.id = generateId();
@@ -30,7 +30,7 @@ export default class BaseGameItem implements IGameItem {
         this.maxFrame = maxFrames
         this.globalPos = globalPos
         this.image = image
-        this.itemName = itemName
+        this.assetKey = assetKey
         
         scene.baseLayer.push(this.image)
 
@@ -69,14 +69,14 @@ export default class BaseGameItem implements IGameItem {
     }
 
     toString() {
-        return this.itemName + ", id: " + this.id + ", xy: " + this.globalPos
+        return this.assetKey + ", id: " + this.id + ", xy: " + this.globalPos
     }
 
     getFrameName() {
         if (this.maxFrame > 0) {
-            return this.itemName + "-f" + String(this.currentFrame)
+            return this.assetKey + "-f" + String(this.currentFrame)
         }
-        return this.itemName
+        return this.assetKey
     }
 
     update() {

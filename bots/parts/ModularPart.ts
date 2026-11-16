@@ -1,5 +1,5 @@
 import {XY, xy} from "../../main/xy"
-import { PartType } from "./PartType";
+import { PartDefinition } from "./PartDefinition";
 import { generateId, PART_DEPTH } from "../../main/constants";
 import ModularBlock from "./ModularBlock";
 import IGameItem from "../contracts/IGameItem";
@@ -9,7 +9,7 @@ import HPImage from "../../main/HPImage";
 
 export class ModularPart extends BaseGameItem {
     parentBlock: ModularBlock;
-    readonly partType: PartType
+    readonly partType: PartDefinition
 
     /** row index is # of used spots -1, col is ordered position */
     private static localPoses: XY[][] = [
@@ -23,18 +23,18 @@ export class ModularPart extends BaseGameItem {
         [xy(-.25,.25), xy(.25, .25), xy(-.25, -.25), xy(.25, -.25)]
     ]
 
-    constructor(scene: MainScene, parentBlock: ModularBlock, type: string) {
+    constructor(scene: MainScene, parentBlock: ModularBlock, assetKey: string) {
 
-        let partType = PartType.get(type)
+        const partType = PartDefinition.fromAssetKey(assetKey)
         let x = parentBlock.globalPos.x + partType.offset.x
         let y = parentBlock.globalPos.y + partType.offset.y
 
         super(
             scene, 
             parentBlock.globalPos, 
-            new HPImage(scene, x, y, type, true)
+            new HPImage(scene, x, y, assetKey, true)
                 .setDepth(PART_DEPTH),
-            partType.assetName,
+            partType.assetKey,
             partType.availableFrames -1
         )
         this.parentBlock = parentBlock;

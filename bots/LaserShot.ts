@@ -21,22 +21,17 @@ export default class LaserShot {
         scene: MainScene,
         shooter: IGameFighter,
         enemies: IGameFighter[],
-        toPoint?: XY
+        targetPosition?: XY,
+        sourcePosition?: XY
     ) {
-        var pos:XY
-
         // Enemy list only: Shoot at random
-        if (toPoint == null) {
-            pos = enemies[Math.floor(Math.random() * enemies.length)].getPosition()
-        } else {
-            pos = toPoint
-        }
+        const destination = targetPosition ?? enemies[Math.floor(Math.random() * enemies.length)].getPosition()
 
-        let fromPos = shooter.getPosition()
-        this.vec = fromPos.getDirVector(pos)
+        const start = sourcePosition ?? shooter.getPosition()
+        this.vec = start.getDirVector(destination)
         this.id = generateId()
         // place it at the from-Object
-        this.image = scene.add.rectangle(fromPos.x, fromPos.y, 2, 16, MyColors.red)
+        this.image = scene.add.rectangle(start.x, start.y, 2, 16, MyColors.red)
         this.image.rotation = Math.atan2(this.vec.y, this.vec.x) + Math.PI / 2
 
         scene.uiCamera.ignore(this.image)
@@ -62,7 +57,7 @@ export default class LaserShot {
                 })
             }
         }
-        scene.physics.add.collider(this.image, scene.base, () => {
+        scene.physics.add.collider(this.image, scene.playerBase, () => {
             this.dead = true
         })
 

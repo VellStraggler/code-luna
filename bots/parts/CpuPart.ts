@@ -5,7 +5,7 @@ import Player from "../../main/Player";
 import ModularBlock from "./ModularBlock";
 import { ModularPart } from "./ModularPart";
 import ModularRobot from "../ModularRobot";
-import { PartType } from "./PartType";
+import { PartDefinition } from "./PartDefinition";
 import * as Phaser from 'phaser'
 
 export default class CpuPart extends ModularPart {
@@ -16,31 +16,31 @@ export default class CpuPart extends ModularPart {
     private static openText = 'open\n\n\nmonitor'
 
     constructor(scene: MainScene, parentBlock: ModularBlock, robot: ModularRobot) {
-        super(scene, parentBlock, PartType.partCpu.assetName)
+        super(scene, parentBlock, PartDefinition.partCpu.assetKey)
         this.player = scene.player
         this.sourceRobot = robot
     }
 
     isNearPlayer(): boolean {
-        return (this.getDistToPlayer() < 30)
+        return (this.getDistanceToPlayer() < 30)
     }
 
-    getDistToPlayer(): number {
+    getDistanceToPlayer(): number {
         if (this.player == null) return 10000
-        let playerPos = this.player.getPosition()
-        let dist = Phaser.Math.Distance.Between(
+        const playerPosition = this.player.getPosition()
+        const distance = Phaser.Math.Distance.Between(
             this.parentBlock.globalPos.x,
             this.parentBlock.globalPos.y,
-            playerPos.x,
-            playerPos.y
+            playerPosition.x,
+            playerPosition.y
         )
-        return dist
+        return distance
     }
 
     override update(animateFrame?: boolean) {
         super.update(animateFrame)
-        let closestBot = this.scene.robots.findRobotClosestToPlayer()
-        if(this.sourceRobot !== closestBot) {
+        const closestRobot = this.scene.robots.findRobotClosestToPlayer()
+        if(this.sourceRobot !== closestRobot) {
             this.guiState = GuiState.closed
         }
     }

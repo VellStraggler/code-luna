@@ -69,7 +69,7 @@ export default class Controls {
         }
     }
 
-    updateMovement(distance: number) {
+    updateMovement(speed: number) {
         if (this.typing) {
             return
         }
@@ -102,7 +102,7 @@ export default class Controls {
             goX *= .7
             goY *= .7
         }
-        this.player.setVelocity(goX * distance, goY * distance)
+        this.player.setVelocity(goX * speed, goY * speed)
     }
 
 }

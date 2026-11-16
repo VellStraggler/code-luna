@@ -6,8 +6,8 @@ export default interface IGameFighter {
     getHP(): number
     getPosition(): XY
     getHitboxes(): HPImage[]
-    takeDamage(amt:number, target:any): void
+    takeDamage(damageAmount: number, target: any): void
     canShoot(): boolean
-    shootLaser(): any
+    shootLaser(): number
     aim(target:XY): void
 }

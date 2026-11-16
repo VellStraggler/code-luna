@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser'
 import { F0, F1, HP_BAR_BG_COLOR, HP_BAR_DEPTH, HP_BAR_DISPLAY_TIME_MS, HP_BAR_FG_COLOR, HP_BG_HEIGHT, HP_BG_WIDTH, HP_FG_HEIGHT, HP_FG_WIDTH, HP_HALF_HEIGHT, HP_X_OFFSET, HP_Y_OFFSET, LASER_ENERGY_USE, SHADOW_DEPTH, SHADOW_OFFSET, STARTING_HEALTH, TELEPORT_RANGE, TWO_FRAME_ASSETS } from './constants.ts'
-import xy, { XY } from './xy.ts'
+import { xy, XY } from './xy.ts'
 import MainScene from '../CodeLuna.ts'
 import IGameFighter from '../bots/contracts/IGameFighter.ts'
 import MyColors from './MyColors.ts'
@@ -106,8 +106,9 @@ export default class HPImage extends Phaser.Physics.Arcade.Image implements IGam
     showHPOnlyNow(ms:number = HP_BAR_DISPLAY_TIME_MS) {
         this.hpBar.setSize(HP_FG_WIDTH * (this.hp/STARTING_HEALTH), HP_FG_HEIGHT)
         this.barVisible()
-        if(this.hpDispTimer) this.hpDispTimer = null
+        this.hpDispTimer?.remove(false)
         this.hpDispTimer = this.scene.time.delayedCall(ms, () => {
+            this.hpDispTimer = null
             this.barVisible(false)
         })
     }
@@ -119,11 +120,11 @@ export default class HPImage extends Phaser.Physics.Arcade.Image implements IGam
         return this.hp
     }
 
-    takeDamage(amt:number) {
+    takeDamage(damageAmount: number) {
         if(!this.visible) {
             return
         }
-        this.hp = Math.max(0,this.hp - amt)
+        this.hp = Math.max(0,this.hp - damageAmount)
         if (this.isDead()) {
             this.respawn()
             this.randomTeleport()
@@ -176,9 +177,9 @@ export default class HPImage extends Phaser.Physics.Arcade.Image implements IGam
         this.hpBar?.setPosition(this.x-HP_X_OFFSET, this.y-HP_Y_OFFSET-HP_HALF_HEIGHT)
     }
 
-    override setScale(amt: number) {
-        super.setScale(amt)
-        this.shadow?.setScale(amt)
+    override setScale(scale: number) {
+        super.setScale(scale)
+        this.shadow?.setScale(scale)
         return this
     }
 

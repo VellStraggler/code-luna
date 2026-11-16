@@ -4,7 +4,7 @@ import HPImage from "./HPImage"
 import MyColors from "./MyColors"
 import * as Phaser from 'phaser'
 
-export default class Base extends HPImage {
+export default class PlayerBase extends HPImage {
     readonly zone: Phaser.GameObjects.Arc
 
     constructor(scene: MainScene, x: number, y: number) {

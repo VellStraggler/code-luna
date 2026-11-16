@@ -1,9 +1,9 @@
 import MainScene from "../../CodeLuna";
 import { BLOCK_DEPTH, BLOCK_RES, Dirs, ENERGY_MS_PER_WHEEL, WHEEL_CHASSIS_NAME } from "../../main/constants";
-import Logic from "../../main/logic";
+import GameGeometry from "../../main/GameGeometry";
 import { xy, XY } from "../../main/xy";
 import ModularRobot from "../ModularRobot";
-import { BlockType } from "./BlockType";
+import { BlockDefinition } from "./BlockDefinition";
 import ModularBlock from "./ModularBlock";
 import * as Phaser from 'phaser'
 
@@ -14,7 +14,7 @@ export default class WheelBlock extends ModularBlock {
         super(
             scene,
             position, 
-            BlockType.wheel,
+            BlockDefinition.wheel,
             robot
         )
         this.chassisImage = null

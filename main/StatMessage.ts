@@ -1,6 +1,6 @@
 import MainScene from "../CodeLuna"
 import { GUI_DEPTH, TEXT_SPACING, TOOLBOX_WIDTH } from "./constants"
-import Logic from "./logic"
+import GameGeometry from "./GameGeometry"
 import MyColors from "./MyColors"
 import { XY, xy } from "./xy"
 
@@ -23,7 +23,7 @@ export class UITextLine {
     }
 
     public parseOrigin(align: string) {
-        this.origin = Logic.parseOrigin(align)
+        this.origin = GameGeometry.originForAlignment(align)
         return this.origin
     }
 

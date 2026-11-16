@@ -10,7 +10,7 @@ export default interface IGameItem {
     maxFrame: number
     rotation: number
     scene: MainScene
-    itemName: string
+    assetKey: string
 
     update(): void
     rotate(): void
