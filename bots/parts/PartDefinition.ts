@@ -27,7 +27,7 @@ export class PartDefinition implements IGameItemDefinition{
     static partBattery =     new PartDefinition('part-battery',           1,   6,   1,   1,  0  * ENERGY_USE_MULT)
     static partCamera =      new PartDefinition('part-camera',            0.4, 3,   1,   2,  1  * ENERGY_USE_MULT)
     static partGun =         new PartDefinition('part-gun',               0.5, 3,   1,   2,  0 * ENERGY_USE_MULT) //active only when firing
-    static partWelder =      new PartDefinition(WELDER_PART,              0.5, 3,   1,   2,  0 * ENERGY_USE_MULT) //active only when firing
+    static partWelder =      new PartDefinition(WELDER_PART,              0.5, 3,   1,   2,  0 * ENERGY_USE_MULT, xy(0,-BLOCK_RES), 2)
     static partQR =          new PartDefinition('part-qr',                0,   0.1, 1,   3,  0  * ENERGY_USE_MULT)
     static partSolar =       new PartDefinition('part-solar-panel',       1,   5,   2,   3,  -1 * ENERGY_USE_MULT)
     static unknown =         new PartDefinition('part-null',              0,   0,   0,   1,  0)

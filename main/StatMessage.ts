@@ -1,5 +1,5 @@
 import MainScene from "../CodeLuna"
-import { GUI_DEPTH, TEXT_SPACING, TOOLBOX_WIDTH } from "./constants"
+import { GUI_DEPTH, TEXT_SPACING, TOOLBOX_OUTLINE, TOOLBOX_WIDTH } from "./constants"
 import GameGeometry from "./GameGeometry"
 import MyColors from "./MyColors"
 import { XY, xy } from "./xy"
@@ -71,7 +71,7 @@ export class UIIconButton {
     }
     select() {
         this.selected = true
-        this.bg.setStrokeStyle(2)
+        this.bg.setStrokeStyle(TOOLBOX_OUTLINE)
     }
     public getObjects(): (Phaser.GameObjects.Rectangle | Phaser.GameObjects.Image)[] {
         return [this.bg, this.icon]

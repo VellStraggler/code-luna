@@ -49,6 +49,7 @@ export enum Dirs {
 export const GUI_SIZE = xy(500,300)
 export const GUI_SECONDARY_SIZE = xy(100, GUI_SIZE.y)
 export const GUI_MARGIN = 4
+export const FACTORY_GUI_PADDING = 32
 export const GUI_TEXT_START = xy(
     WINDOW_HALF.x - GUI_SIZE.x/2 + GUI_MARGIN,
     WINDOW_HALF.y - GUI_SIZE.y/2 + GUI_MARGIN
@@ -56,6 +57,7 @@ export const GUI_TEXT_START = xy(
 export const TEXT_SPACING = 20
 export const TOOLBOX_WIDTH = 40
 export const TOOLBOX_SPACING = 8
+export const TOOLBOX_OUTLINE = 3
 
 // Movement and physics
 export const GAME_SPEED = 8000 / 60
@@ -106,6 +108,7 @@ export const LASER_SPEED = 400
 export const LASER_LIFE = 2
 
 // Mining and refining
+export const DRILL_TARGET_RANGE_METERS = 10
 export const REFINEMENT_RATE_MS = 0.2
 export const MINING_RATE_MS = 2
 export const STONE_MINE_RATE = 0.34

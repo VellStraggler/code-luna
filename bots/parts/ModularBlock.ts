@@ -104,6 +104,7 @@ export default class ModularBlock extends BaseGameItem {
     public connectRobotAt(otherBlock: ModularBlock): boolean {
         if (this.robot === otherBlock.robot) return false
         if (this.blockType === BlockDefinition.wheel && otherBlock.blockType === BlockDefinition.wheel) return false
+        if (this.robot.blocks.length < otherBlock.robot.blocks.length) return otherBlock.connectRobotAt(this)
 
         const dx = otherBlock.image.x - this.image.x
         const dy = otherBlock.image.y - this.image.y
@@ -119,6 +120,7 @@ export default class ModularBlock extends BaseGameItem {
 
         this.robot.position = xy(this.image.x, this.image.y).subtract(this.localPos)
         this.robot.absorb(otherBlock.robot, offset)
+        this.scene.sound.play("weld")
         return true
     }
 
@@ -167,6 +169,17 @@ export default class ModularBlock extends BaseGameItem {
         return this
     }
     
+    removePart(part: ModularPart): boolean {
+        const index = this.modularParts.indexOf(part)
+        if (index < 0) return false
+        this.modularParts.splice(index, 1)
+        this.freshnessImages.get(part.image)?.destroy()
+        this.freshnessImages.delete(part.image)
+        part.destroy()
+        this.updateFreshness()
+        return true
+    }
+
     public disconnect(scene: MainScene, robots: ModularRobots, robot: ModularRobot | null = null) {
         const sourceRobot = robot ?? this.robot
         if (!sourceRobot.blocks.includes(this) || sourceRobot.blocks.length <= 1) return

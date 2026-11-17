@@ -1,6 +1,6 @@
 import {XY, xy} from "../../main/xy"
 import { PartDefinition } from "./PartDefinition";
-import { generateId, PART_DEPTH } from "../../main/constants";
+import { BLOCK_RES, DRILL_TARGET_RANGE_METERS, F0, PART_DEPTH, PART_DRILL_NAME, WELDER_PART } from "../../main/constants";
 import ModularBlock from "./ModularBlock";
 import IGameItem from "../contracts/IGameItem";
 import MainScene from "../../CodeLuna";
@@ -32,13 +32,15 @@ export class ModularPart extends BaseGameItem {
         super(
             scene, 
             parentBlock.globalPos, 
-            new HPImage(scene, x, y, assetKey, true)
+            new HPImage(scene, x, y, assetKey + (partType.availableFrames > 1 ? F0 : ""), true)
                 .setDepth(PART_DEPTH),
             partType.assetKey,
             partType.availableFrames -1
         )
         this.parentBlock = parentBlock;
         this.partType = partType
+        this.currentFrame = 0
+        this.image.setTexture(this.getFrameName())
     }
 
     assignPosition(spots:number ,index:number) {
@@ -46,8 +48,74 @@ export class ModularPart extends BaseGameItem {
     }
 
     override rotate(amount: number = 0) {
+        if (this.assetKey === WELDER_PART) {
+            const safeRotation = this.findWelderRotation(amount)
+            this.image.setVisible(safeRotation !== null)
+            if (safeRotation === null) {
+                this.parentBlock.updateFreshness()
+                return
+            }
+            amount = safeRotation
+        }
         super.rotate(amount)
+        this.updatePosition()
         this.parentBlock.updateFreshness()
+    }
+
+    private getPositionAtRotation(rotation: number): XY {
+        const offset = this.localPos.add(this.partType.offset)
+        const orbiting = this.assetKey === PART_DRILL_NAME || this.assetKey === WELDER_PART
+        const angle = orbiting ? rotation : 0
+        const cos = Math.cos(angle)
+        const sin = Math.sin(angle)
+        return xy(
+            this.parentBlock.globalPos.x + offset.x * cos - offset.y * sin,
+            this.parentBlock.globalPos.y + offset.x * sin + offset.y * cos
+        )
+    }
+
+    private updatePosition() {
+        const position = this.getPositionAtRotation(this.image.rotation)
+        this.image.setPosition(position.x, position.y)
+    }
+
+    private findWelderRotation(desired: number): number | null {
+        const obstacles = this.parentBlock.robot.blocks
+            .filter(block => block !== this.parentBlock && block.image.active)
+            .map(block => block.image.getBounds())
+        const width = Math.abs(this.image.width * this.image.scaleX)
+        const height = Math.abs(this.image.height * this.image.scaleY)
+        const isClear = (angle: number) => {
+            const position = this.getPositionAtRotation(angle)
+            const cos = Math.abs(Math.cos(angle))
+            const sin = Math.abs(Math.sin(angle))
+            const halfWidth = (width * cos + height * sin) / 2
+            const halfHeight = (width * sin + height * cos) / 2
+            return obstacles.every(bounds =>
+                position.x + halfWidth <= bounds.left + 1e-6 ||
+                position.x - halfWidth >= bounds.right - 1e-6 ||
+                position.y + halfHeight <= bounds.top + 1e-6 ||
+                position.y - halfHeight >= bounds.bottom - 1e-6
+            )
+        }
+        if (isClear(desired)) return desired
+
+        let nearest: number | null = null
+        let distance = Infinity
+        for (const angle of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) {
+            const difference = Math.abs(Math.atan2(Math.sin(angle - desired), Math.cos(angle - desired)))
+            if (difference < distance && isClear(angle)) {
+                nearest = angle
+                distance = difference
+            }
+        }
+        for (let degree = 1; degree <= 180; degree++) {
+            const delta = degree * Math.PI / 180
+            if (delta >= distance) break
+            if (isClear(desired + delta)) return desired + delta
+            if (isClear(desired - delta)) return desired - delta
+        }
+        return nearest
     }
 
     /** 0 if part is not activated. */
@@ -59,15 +127,31 @@ export class ModularPart extends BaseGameItem {
     }
 
     override update(animateFrame: boolean = true) {
-        let x = this.parentBlock.globalPos.x + this.localPos.x + this.partType.offset.x
-        let y = this.parentBlock.globalPos.y + this.localPos.y + this.partType.offset.y
+        const center = this.parentBlock.globalPos
+        if (this.assetKey === PART_DRILL_NAME) {
+            this.updatePosition()
+            const site = this.scene.getNearestMineSite(
+                xy(this.image.x, this.image.y), DRILL_TARGET_RANGE_METERS * BLOCK_RES
+            )
+            if (site) {
+                super.rotate(Math.atan2(site.y - center.y, site.x - center.x) + Math.PI / 2)
+            }
+        } else if (this.assetKey === WELDER_PART) {
+            const robot = this.parentBlock.robot
+            this.rotate(robot.hasMoved ? robot.movingDirectionRadians + Math.PI / 2 : this.image.rotation)
+        }
 
-        this.image.setPosition(x,y)
+        this.updatePosition()
         // match velocity
         if (this.parentBlock.image.body) {
             this.image.setVelocity(this.parentBlock.image.body.velocity.x, this.parentBlock.image.body.velocity.y)
         }
 
-        this.updateAnimation(animateFrame)
+        if (!this.isActive && this.maxFrame > 0) {
+            this.currentFrame = 0
+            this.image.setTexture(this.getFrameName())
+        } else {
+            this.updateAnimation(animateFrame)
+        }
     }
 }

@@ -6,7 +6,7 @@ import Player, { PlayerState } from "./main/Player"
 import PlayerBase from "./main/PlayerBase"
 import GUI from "./main/gui"
 import HPImage from './main/HPImage'
-import { BASIC_ASSET_NAMES, WINDOW, BLOCK_RES, LASER_TEST_MS, FRAME_TIME_MS, BASE_POS, GAME_SPEED, REFINEMENT_RATE_MS, MINING_RATE_MS, COSMORITE_ORE, TWO_FRAME_ASSETS, F1, F0, BLOCK_DEPTH, FACTORY_BLOCK } from './main/constants'
+import { BASIC_ASSET_NAMES, WINDOW, BLOCK_RES, LASER_TEST_MS, FRAME_TIME_MS, BASE_POS, GAME_SPEED, REFINEMENT_RATE_MS, MINING_RATE_MS, GAS_MINE_RATE, STONE_MINE_RATE, COSMORITE_ORE, TWO_FRAME_ASSETS, F1, F0, BLOCK_DEPTH, FACTORY_BLOCK } from './main/constants'
 import IGameFighter from './bots/contracts/IGameFighter'
 import { XY, xy } from './main/xy'
 import LaserShot from './bots/LaserShot'
@@ -25,6 +25,7 @@ export default class MainScene extends Phaser.Scene {
     public lasers: LaserShot[] = []
     public playerBase!: PlayerBase
     public cosmoriteOre!: HPImage
+    public mineSites: HPImage[] = []
     public mainStats!: MainStats
     public GUI!: GUI
     public uiCamera!: Phaser.Cameras.Scene2D.Camera
@@ -137,12 +138,28 @@ export default class MainScene extends Phaser.Scene {
     }
 
     createOre(x = 0, y = 0) {
-        this.cosmoriteOre = new HPImage(this, x, y, COSMORITE_ORE, false) 
+        const ore = new HPImage(this, x, y, COSMORITE_ORE, false)
             .setImmovable(true)
+        this.cosmoriteOre = ore
+        this.mineSites.push(ore)
         
-        this.physics.add.collider(this.player, this.cosmoriteOre, () => {
-            this.cosmoriteOre.isOverlapped = true;
+        this.physics.add.collider(this.player, ore, () => {
+            ore.isOverlapped = true;
         })
+    }
+
+    getNearestMineSite(position: XY, range = Infinity): HPImage | null {
+        let nearest: HPImage | null = null
+        let distance = range
+        for (const site of this.mineSites) {
+            if (!site.active || !site.visible || !site.body?.enable || site.isDead()) continue
+            const nextDistance = Phaser.Math.Distance.Between(position.x, position.y, site.x, site.y)
+            if (nextDistance <= distance) {
+                nearest = site
+                distance = nextDistance
+            }
+        }
+        return nearest
     }
 
     createPlayer() {
@@ -181,16 +198,18 @@ export default class MainScene extends Phaser.Scene {
         this.lasers = this.lasers.filter(laser => !laser.dead)
 
         /// MINING ///
-        if(this.cosmoriteOre.isOverlapped) {
-            if (this.cosmoriteOre.isDead()) {
-                this.cosmoriteOre.randomTeleport(800)
-                this.cosmoriteOre.respawn()
+        for (const site of this.mineSites) {
+            if (!site.isOverlapped) continue
+            if (site.isDead()) {
+                site.randomTeleport(800)
+                site.respawn()
             } else {
                 const minedAmount = (MINING_RATE_MS * delta)/1000
-                this.mainStats.incCosmorite(minedAmount)
-                this.cosmoriteOre.takeDamage(minedAmount/10)
+                this.mainStats.incCosmorite(minedAmount * GAS_MINE_RATE)
+                this.mainStats.incLunestone(minedAmount * STONE_MINE_RATE)
+                site.takeDamage(minedAmount/10)
             }
-            this.cosmoriteOre.isOverlapped = false
+            site.isOverlapped = false
         }
 
         /// BASE GUI ///
@@ -212,6 +231,7 @@ export default class MainScene extends Phaser.Scene {
             robotI.update(delta)
             robotI.aim(this.player.getPosition())
         }
+        this.robots.connectWeldingBlocks()
         this.robots.connectFreshBlocks()
 
         const isAnyRobotDrilling = this.robots.robots.some(robot => robot.isDrilling)
@@ -287,9 +307,7 @@ export default class MainScene extends Phaser.Scene {
         if (nearestBlocks.length >= 2) {
             let blockA = nearestBlocks[0]
             let blockB = nearestBlocks[1]
-            if (blockA.connectRobotAt(blockB)) {
-                this.sound.play("weld")
-            }
+            blockA.connectRobotAt(blockB)
         } else if (nearestBlocks.length == 1) {
             const block = nearestBlocks[0]
             if (block.hp < block.maxHP && block.image.getBounds().contains(clickPosition.x, clickPosition.y)) {

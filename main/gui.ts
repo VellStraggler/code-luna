@@ -3,13 +3,15 @@ import MainScene from "../CodeLuna"
 import { HIDE_POS, GUI_DEPTH, WINDOW, GUI_SIZE, GUI_SECONDARY_SIZE, GUI_MARGIN, TEXT_SPACING, TOOLBOX_WIDTH, TOOLBOX_SPACING, FACTORY_BLOCK, PART_GUN_NAME, WELDER_PART, F0, RESOURCE_TRANSFER_AMOUNT, RESOURCE_TRANSFER_INTERVAL_MS } from "./constants"
 import MyColors from "./MyColors"
 import ModularRobot from "../bots/ModularRobot"
-import { GuiState } from "../bots/parts/CpuPart"
+import CpuPart, { GuiState } from "../bots/parts/CpuPart"
 import UIColumn from "./UITextColumn"
 import RobotFunctionEditor from "./RobotFunctionEditor"
 import FactoryBlock from "../bots/parts/FactoryBlock"
 import FactoryGUI from "./FactoryGUI"
+import { PlayerState } from "./Player"
 
 type RobotResource = "storedLunestone" | "storedCosmorite"
+type NotifierTarget = CpuPart | FactoryBlock
 
 export default class GUI {
     private scene: MainScene
@@ -30,6 +32,8 @@ export default class GUI {
 
     public messageOpenRobotGUI!: Phaser.GameObjects.Text
     public robotOfCPU: ModularRobot | null = null
+    private cpuOfGUI: CpuPart | null = null
+    private notifierTarget: NotifierTarget | null = null
     public clickMeOutline: Phaser.GameObjects.Rectangle
     private monitorCloseButton!: Phaser.GameObjects.Text
     private robotFunctionEditor: RobotFunctionEditor
@@ -111,9 +115,10 @@ export default class GUI {
         this.messageOpenRobotGUI.setInteractive({ useHandCursor: true }).setDepth(GUI_DEPTH).on('pointerdown', (
             _pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData
         ) => {
+            if (this.scene.player.playerState !== PlayerState.holdingNothing) return
             event.stopPropagation()
             if (this.baseGUI.isVisible || this.factoryGUI.isVisible) return
-            const cpu = this.robotOfCPU?.getCpuPart()
+            const cpu = this.cpuOfGUI
             if (!cpu?.isNearPlayer()) return
             cpu.guiState = GuiState.open
             this.toggleRobotGUI(true)
@@ -139,6 +144,7 @@ export default class GUI {
             .on("pointerdown", (
                 _pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData
             ) => {
+                if (this.scene.player.playerState !== PlayerState.holdingNothing) return
                 event.stopPropagation()
                 if (this.baseGUI.isVisible || !this.factoryOfGUI?.isNearPlayer()) return
                 this.factoryOfGUI.guiState = GuiState.open
@@ -158,33 +164,67 @@ export default class GUI {
         this.factoryOutline.setPosition(HIDE_POS.x, HIDE_POS.y).setVisible(false)
     }
 
-    private updateFactoryGUI() {
-        let closest: FactoryBlock | null = null
-        let distance = Infinity
+    private selectNotifierTarget() {
+        if (this.baseGUI.isVisible || this.scene.player.playerState !== PlayerState.holdingNothing) {
+            this.notifierTarget = null
+            return
+        }
+        const targets: NotifierTarget[] = []
         for (const robot of this.scene.robots) {
             for (const block of robot.blocks) {
-                if (!(block instanceof FactoryBlock) || !block.image.active || !block.image.body) continue
-                const nextDistance = block.getDistanceToPlayer()
-                if (nextDistance < distance) {
-                    closest = block
-                    distance = nextDistance
+                if (!block.image.active || !block.image.visible || !block.image.body?.enable) continue
+                if (block instanceof FactoryBlock) targets.push(block)
+                for (const part of block.modularParts) {
+                    if (part instanceof CpuPart && part.image.active && part.image.visible && part.image.body?.enable) {
+                        targets.push(part)
+                    }
                 }
             }
         }
+        const current = this.notifierTarget
+        if (current && targets.includes(current) && current.guiState === GuiState.open &&
+            current.getDistanceToPlayer() < 50) return
+
+        const nearby = targets.filter(target => target.isNearPlayer())
+        if (nearby.length <= 1) {
+            this.notifierTarget = nearby[0] ?? null
+            return
+        }
+        const pointer = this.scene.input.activePointer
+        const point = this.scene.cameras.main.getWorldPoint(pointer.x, pointer.y)
+        const hovered = nearby.filter(target =>
+            target.image.getBounds().contains(point.x, point.y) ||
+            (target instanceof CpuPart && target.parentBlock.image.getBounds().contains(point.x, point.y))
+        )
+        hovered.sort((a, b) =>
+            Math.hypot(a.image.x - point.x, a.image.y - point.y) -
+            Math.hypot(b.image.x - point.x, b.image.y - point.y))
+        if (hovered.length > 0) {
+            this.notifierTarget = hovered[0]
+            return
+        }
+        const prompt = current instanceof CpuPart ? this.messageOpenRobotGUI : this.messageOpenFactoryGUI
+        this.notifierTarget = current && nearby.includes(current) && prompt.visible &&
+            prompt.getBounds().contains(point.x, point.y) ? current : null
+    }
+
+    private updateFactoryGUI() {
+        const closest = this.notifierTarget instanceof FactoryBlock ? this.notifierTarget : null
         if (this.factoryOfGUI && this.factoryOfGUI !== closest) {
             this.factoryOfGUI.guiState = GuiState.closed
             this.toggleFactoryGUI(false)
         }
         this.factoryOfGUI = closest
         this.factoryGUI.setFactory(closest)
-        if (!closest || this.baseGUI.isVisible || this.robotGUI.isVisible) {
+        if (!closest || this.baseGUI.isVisible || this.robotGUI.isVisible ||
+            this.scene.player.playerState !== PlayerState.holdingNothing) {
             if (closest) closest.guiState = GuiState.closed
             this.hideFactoryNotifier()
             this.toggleFactoryGUI(false)
             return
         }
         if (closest.guiState === GuiState.open) {
-            if (distance >= 50) closest.guiState = GuiState.closed
+            if (closest.getDistanceToPlayer() >= 50) closest.guiState = GuiState.closed
         } else {
             closest.guiState = closest.isNearPlayer() ? GuiState.notifying : GuiState.closed
         }
@@ -215,6 +255,7 @@ export default class GUI {
 
     update() {
         this.hud.update()
+        this.selectNotifierTarget()
         this.updateFactoryGUI()
         this.updateRobotGUI()
         this.updateResourceTransfer()
@@ -223,14 +264,16 @@ export default class GUI {
     }
 
     public updateRobotGUI() {
-        const previousCpu = this.robotOfCPU?.getCpuPart()
-        this.robotOfCPU = this.scene.robots.findRobotClosestToPlayer()
+        const previousCpu = this.cpuOfGUI
+        const cpu = this.notifierTarget instanceof CpuPart ? this.notifierTarget : null
+        this.cpuOfGUI = cpu
+        this.robotOfCPU = cpu?.parentBlock.robot ?? null
         this.robotFunctionEditor.setRobot(this.robotOfCPU)
-        const cpu = this.robotOfCPU?.getCpuPart()
         this.scene.player.closestCPU = cpu ?? null
         if (previousCpu && previousCpu !== cpu) previousCpu.guiState = GuiState.closed
 
-        if (!cpu || this.baseGUI.isVisible || this.factoryGUI.isVisible) {
+        if (!cpu || this.baseGUI.isVisible || this.factoryGUI.isVisible ||
+            this.scene.player.playerState !== PlayerState.holdingNothing) {
             if (cpu) cpu.guiState = GuiState.closed
             this.hideCpuNotifier()
             this.toggleRobotGUI(false)
@@ -304,15 +347,14 @@ export default class GUI {
         this.monitorContainer.add(this.monitorCloseButton)
     }
 
-    private layoutMonitor() {
+    private layoutMonitor(outerPadding = 0) {
         const factoryOpen = this.factoryGUI.isVisible
-        const sidePadding = factoryOpen ? 32 : 0
-        const topPadding = Math.max(this.monitorCloseButton.height + GUI_MARGIN + GUI_MARGIN / 2, sidePadding)
+        const topPadding = outerPadding + this.monitorCloseButton.height + GUI_MARGIN + GUI_MARGIN / 2
         const columns = factoryOpen ? [] :
             this.baseGUI.isVisible ? [this.baseGUI] : [this.robotGUI, this.robotStatsGUI]
         const sizes = [GUI_SIZE, GUI_SECONDARY_SIZE]
         let screenHeight = 0
-        let width = sidePadding
+        let width = outerPadding
         for (const [index, screen] of this.monitorScreens.entries()) {
             screen.setVisible(!factoryOpen || index === 0)
             if (factoryOpen && index !== 0) continue
@@ -323,11 +365,11 @@ export default class GUI {
             screenHeight = Math.max(screenHeight, height)
             width += screen.width + TEXT_SPACING
         }
-        width += sidePadding - TEXT_SPACING
-        const height = topPadding + screenHeight + (factoryOpen ? sidePadding : GUI_MARGIN)
+        width += outerPadding - TEXT_SPACING
+        const height = topPadding + screenHeight + outerPadding + GUI_MARGIN
         this.monitorContainer.setSize(width, height)
             .setPosition((WINDOW.x - width) / 2, (WINDOW.y - height) / 2)
-        this.monitorCloseButton.setPosition(width, GUI_MARGIN)
+        this.monitorCloseButton.setPosition(width - outerPadding, outerPadding + GUI_MARGIN)
     }
 
     private initPlayerTools() {
@@ -448,7 +490,7 @@ export default class GUI {
     }
 
     public closeRobotGUI() {
-        const cpu = this.robotOfCPU?.getCpuPart()
+        const cpu = this.cpuOfGUI
         if (cpu) cpu.guiState = GuiState.closed
         this.toggleRobotGUI(false)
         this.hideCpuNotifier()
@@ -462,7 +504,7 @@ export default class GUI {
         if (visible && this.baseGUI.isVisible) return
         if (this.factoryGUI.isVisible === visible) return
         if (visible) {
-            const cpu = this.robotOfCPU?.getCpuPart()
+            const cpu = this.cpuOfGUI
             if (cpu) cpu.guiState = GuiState.closed
             this.robotGUI.setVisibility(false)
             this.robotStatsGUI.setVisibility(false)
@@ -479,7 +521,7 @@ export default class GUI {
             this.hideFactoryNotifier()
             if (this.factoryOfGUI) this.factoryOfGUI.guiState = GuiState.closed
             this.factoryGUI.setVisible(false)
-            const cpu = this.robotOfCPU?.getCpuPart()
+            const cpu = this.cpuOfGUI
             if (cpu) cpu.guiState = GuiState.closed
         }
         if(this.baseGUI.isVisible == visible) return

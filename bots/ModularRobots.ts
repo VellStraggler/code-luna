@@ -44,6 +44,37 @@ export default class ModularRobots {
         this.registerBlocks(newRobot)
     }
 
+    connectWeldingBlocks(target?: ModularRobot) {
+        for (const robot of target ? [target] : [...this.robots]) {
+            for (const welder of [...robot.parts]) {
+                if (welder.partType !== PartDefinition.partWelder) continue
+                welder.deactivate()
+                if (!robot.hasCpu() || welder.parentBlock.robot !== robot ||
+                    !robot.blocks.includes(welder.parentBlock) ||
+                    !welder.image.active || !welder.image.visible || !welder.image.body?.enable) continue
+                const bounds = welder.image.getBounds()
+                let connected = false
+                for (const otherRobot of [...this.robots]) {
+                    if (otherRobot === robot) continue
+                    for (const block of otherRobot.blocks) {
+                        if (!block.image.active || !block.image.visible || !block.image.body?.enable) continue
+                        if (Phaser.Geom.Intersects.RectangleToRectangle(bounds, block.image.getBounds()) &&
+                            welder.parentBlock.connectRobotAt(block)) {
+                            if (welder.image.active) {
+                                welder.activate()
+                                welder.updateAnimation(true)
+                                welder.parentBlock.updateFreshness()
+                            }
+                            connected = true
+                            break
+                        }
+                    }
+                    if (connected) break
+                }
+            }
+        }
+    }
+
     connectFreshBlocks() {
         for (const robot of [...this.robots]) {
             for (const block of [...robot.blocks]) {
@@ -134,7 +165,9 @@ export default class ModularRobots {
             this.collisionBlocks.add(block.image)
             const overlap = this.scene.physics.add.overlap(this.scene.playerBase.zone, block.image, () => {
                 const owner = block.robot
-                if (!owner.blocks.includes(block) || this.offloadedThisStep.has(owner)) return
+                if (!owner.blocks.includes(block)) return
+                if (block.hp < block.maxHP) block.resetHP()
+                if (this.offloadedThisStep.has(owner)) return
                 this.offloadedThisStep.add(owner)
                 const transferAmount = MINING_RATE_MS / 100
                 const lunestone = Math.min(transferAmount, owner.storedLunestone)

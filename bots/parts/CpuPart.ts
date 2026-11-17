@@ -37,13 +37,6 @@ export default class CpuPart extends ModularPart {
         return distance
     }
 
-    override update(animateFrame?: boolean) {
-        super.update(animateFrame)
-        const closestRobot = this.scene.robots.findRobotClosestToPlayer()
-        if(this.sourceRobot !== closestRobot) {
-            this.guiState = GuiState.closed
-        }
-    }
 }
 
 export enum GuiState {

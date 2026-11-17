@@ -39,32 +39,64 @@ export default class FactoryBlock extends ModularBlock {
         return { gas, stone }
     }
 
-    print(): string {
-        if (!this.image.active || !this.robot.blocks.includes(this)) return "Factory disconnected."
-        if (this.selectedParts.size > this.selectedBlock.partLimit) {
-            return `This block holds at most ${this.selectedBlock.partLimit} parts.`
-        }
+    private getOutputPosition(direction: Dirs) {
         const offsets = {
             [Dirs.up]: xy(0, -1),
             [Dirs.down]: xy(0, 1),
             [Dirs.left]: xy(-1, 0),
             [Dirs.right]: xy(1, 0)
         }
-        const position = xy(this.image.x, this.image.y).add(offsets[this.outputDirection].multiply(BLOCK_RES))
+        return xy(this.image.x, this.image.y).add(offsets[direction].multiply(BLOCK_RES))
+    }
+
+    private isPositionBlocked(position: XY): boolean {
         const bounds = new Phaser.Geom.Rectangle(
             position.x - BLOCK_RES / 2 + 1, position.y - BLOCK_RES / 2 + 1,
             BLOCK_RES - 2, BLOCK_RES - 2
         )
         for (const robot of this.scene.robots) {
             if (robot.blocks.some(block =>
-                Phaser.Geom.Intersects.RectangleToRectangle(bounds, block.image.getBounds())
-            )) return "Output blocked. Clear the selected side."
+                block !== this && Phaser.Geom.Intersects.RectangleToRectangle(bounds, block.image.getBounds())
+            )) return true
         }
+        return false
+    }
+
+    private getPrintPlacement(direction: Dirs): { position: XY, retreat: XY | null } | null {
+        const position = this.getOutputPosition(direction)
+        if (!this.isPositionBlocked(position)) return { position, retreat: null }
+        if (this.robot.blocks.length !== 1) return null
+
+        const current = xy(this.image.x, this.image.y)
+        const retreat = current.subtract(position.subtract(current))
+        if (this.isPositionBlocked(retreat) || this.isPositionBlocked(current)) return null
+        return { position: current, retreat }
+    }
+
+    isOutputBlocked(direction: Dirs): boolean {
+        return this.getPrintPlacement(direction) === null
+    }
+
+    print(): string {
+        if (!this.image.active || !this.robot.blocks.includes(this)) return "Factory disconnected."
+        if (this.selectedParts.size > this.selectedBlock.partLimit) {
+            return `This block holds at most ${this.selectedBlock.partLimit} parts.`
+        }
+        const placement = this.getPrintPlacement(this.outputDirection)
+        if (!placement) return "Output blocked. Clear the selected side."
         const cost = this.getPrintCost()
         const gas = this.fromUser ? this.scene.mainStats.getGas() : this.robot.storedCosmorite
         const stone = this.fromUser ? this.scene.mainStats.getLunestone() : this.robot.storedLunestone
         if (gas < cost.gas || stone < cost.stone) return "Not enough resources."
 
+        if (placement.retreat) {
+            this.image.setPosition(placement.retreat.x, placement.retreat.y)
+            this.image.body?.reset(placement.retreat.x, placement.retreat.y)
+            this.robot.position = placement.retreat.subtract(this.localPos)
+            this.robot.proxyGlobalBlock = this
+            this.update(false)
+        }
+        const position = placement.position
         const printed = ModularRobot.create(this.scene, position.x, position.y, this.selectedBlock)
         const block = printed.blocks[0]
         block.printedBy = this

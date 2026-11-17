@@ -82,7 +82,8 @@ export default class RobotFunctionEditor {
         if (!functions) {
             functions = [
                 { name: "sendToMine", body: "robot.setGoal(scene.debug_getMineSiteXY())", expanded: false },
-                { name: "sendHome", body: "robot.setGoal(scene.playerBase.getPosition())", expanded: false }
+                { name: "sendHome", body: "robot.setGoal(scene.playerBase.getPosition())", expanded: false },
+                { name: "weld", body: "robot.weld()", expanded: false }
             ]
             this.functionsByRobot.set(robot, functions)
         }
