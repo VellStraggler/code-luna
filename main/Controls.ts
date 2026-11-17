@@ -51,7 +51,8 @@ export default class Controls {
         if(
             (hits.some(obj => obj instanceof Phaser.GameObjects.Rectangle)) ||
             (hits.some(obj => obj instanceof Phaser.GameObjects.Text)) ||
-            this.scene.GUI.baseGUI.isVisible
+            this.scene.GUI.baseGUI.isVisible ||
+            this.scene.GUI.isFactoryOpen
         ) return
 
         switch (this.player.playerState) {

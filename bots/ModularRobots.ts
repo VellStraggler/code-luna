@@ -4,28 +4,68 @@ import { xy } from "../main/xy"
 import { BlockDefinition } from "./parts/BlockDefinition"
 import ModularRobot from "./ModularRobot"
 import { PartDefinition } from "./parts/PartDefinition"
-import { MINING_RATE_MS } from "../main/constants"
+import { BLOCK_RES, MINING_RATE_MS } from "../main/constants"
 import ModularBlock from "./parts/ModularBlock"
 import * as Phaser from 'phaser'
 
 export default class ModularRobots {
     robots: ModularRobot[]
     private scene: MainScene
-    private offloadingBlocks = new WeakSet<ModularBlock>()
+    private registeredBlocks = new WeakSet<ModularBlock>()
+    private collisionBlocks: Phaser.GameObjects.Group
+    private blocksByImage = new WeakMap<object, ModularBlock>()
     private offloadedThisStep = new Set<ModularRobot>()
     
     constructor(scene: MainScene, robots: ModularRobot[] = []) {
         this.robots = robots
         this.scene = scene
+        this.collisionBlocks = scene.add.group()
+        scene.physics.add.collider(this.collisionBlocks, this.collisionBlocks, (first, second) => {
+            const firstBlock = this.blocksByImage.get(first)!
+            const secondBlock = this.blocksByImage.get(second)!
+            firstBlock.robot.proxyGlobalBlock = firstBlock
+            secondBlock.robot.proxyGlobalBlock = secondBlock
+        }, (first, second) => {
+            const firstBlock = this.blocksByImage.get(first)
+            const secondBlock = this.blocksByImage.get(second)
+            return firstBlock != null && secondBlock != null &&
+                firstBlock.robot !== secondBlock.robot &&
+                firstBlock.robot.blocks.includes(firstBlock) &&
+                secondBlock.robot.blocks.includes(secondBlock)
+        })
         scene.physics.world.on(Phaser.Physics.Arcade.Events.WORLD_STEP, () => {
             this.offloadedThisStep.clear()
         })
-        for (const robot of robots) this.allowOffloading(robot)
+        for (const robot of robots) this.registerBlocks(robot)
     }
 
     push(newRobot: ModularRobot) {
         this.robots.push(newRobot)
-        this.allowOffloading(newRobot)
+        this.registerBlocks(newRobot)
+    }
+
+    connectFreshBlocks() {
+        for (const robot of [...this.robots]) {
+            for (const block of [...robot.blocks]) {
+                if (!block.isFresh || block.robot !== robot) continue
+                let connected = false
+                for (const otherRobot of [...this.robots]) {
+                    if (otherRobot === block.robot) continue
+                    for (const other of otherRobot.blocks) {
+                        if (!block.canAutoConnectTo(other)) continue
+                        const dx = Math.abs(block.image.x - other.image.x)
+                        const dy = Math.abs(block.image.y - other.image.y)
+                        const adjacent = (Math.abs(dx - BLOCK_RES) <= 2 && dy < BLOCK_RES / 2) ||
+                            (Math.abs(dy - BLOCK_RES) <= 2 && dx < BLOCK_RES / 2)
+                        if (adjacent && other.connectRobotAt(block)) {
+                            connected = true
+                            break
+                        }
+                    }
+                    if (connected) break
+                }
+            }
+        }
     }
 
     get(index:number) {
@@ -82,15 +122,16 @@ export default class ModularRobots {
             .addBlockType(BlockDefinition.wheel, 2, 0)
             .addEnemyCollider(this.scene.player)
             .reload()
-        this.robots.push(robot)
+        this.push(robot)
         return robot
     }
 
-    allowOffloading(robot: ModularRobot) {
+    registerBlocks(robot: ModularRobot) {
         for (const block of robot.blocks) {
-            if (this.offloadingBlocks.has(block)) continue
-            this.offloadingBlocks.add(block)
-            const collider = this.scene.physics.add.collider(this.scene.playerBase, block.image)
+            if (this.registeredBlocks.has(block)) continue
+            this.registeredBlocks.add(block)
+            this.blocksByImage.set(block.image, block)
+            this.collisionBlocks.add(block.image)
             const overlap = this.scene.physics.add.overlap(this.scene.playerBase.zone, block.image, () => {
                 const owner = block.robot
                 if (!owner.blocks.includes(block) || this.offloadedThisStep.has(owner)) return
@@ -108,7 +149,6 @@ export default class ModularRobots {
                 }
             })
             block.image.once(Phaser.GameObjects.Events.DESTROY, () => {
-                collider.destroy()
                 overlap.destroy()
             })
         }

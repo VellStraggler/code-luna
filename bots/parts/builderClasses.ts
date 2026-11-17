@@ -7,10 +7,13 @@ import CpuPart from "./CpuPart";
 import ModularBlock from "./ModularBlock";
 import { ModularPart } from "./ModularPart";
 import WheelBlock from "./WheelBlock";
+import FactoryBlock from "./FactoryBlock";
 
 export default class BlockBuilder {
     public static new(scene: MainScene, offset:XY, blockType: BlockDefinition, robot: ModularRobot): ModularBlock {
         switch (blockType) {
+            case (BlockDefinition.factory):
+                return new FactoryBlock(scene, offset, robot)
             case (BlockDefinition.wheel):
                 return new WheelBlock(scene, offset,
                     robot)

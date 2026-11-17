@@ -143,7 +143,6 @@ export default class MainScene extends Phaser.Scene {
         this.physics.add.collider(this.player, this.cosmoriteOre, () => {
             this.cosmoriteOre.isOverlapped = true;
         })
-        this.robots.get(0).notifyOfCosmorite()
     }
 
     createPlayer() {
@@ -213,6 +212,7 @@ export default class MainScene extends Phaser.Scene {
             robotI.update(delta)
             robotI.aim(this.player.getPosition())
         }
+        this.robots.connectFreshBlocks()
 
         const isAnyRobotDrilling = this.robots.robots.some(robot => robot.isDrilling)
         if (isAnyRobotDrilling && !this.drillSound.isPlaying) {
@@ -306,15 +306,13 @@ export default class MainScene extends Phaser.Scene {
             this.mainStats.incLunestone(-1)
             const x = Math.round(pointer.worldX/BLOCK_RES) * BLOCK_RES
             const y = Math.round(pointer.worldY/BLOCK_RES) * BLOCK_RES
-            this.robots.push(ModularRobot.create(this, x, y)
-                .addPart(PartDefinition.partCpu)
+            this.robots.push(ModularRobot.create(this, x, y, BlockDefinition.factory)
                 .addEnemyCollider(this.player))
         }
     }
     public debug_summonRobot() {
         let newRobot = this.robots.get(0).deepCopy(200,200)
         newRobot.addEnemyCollider(this.player)
-        newRobot.notifyOfCosmorite()
         this.robots.push(newRobot)
         this.uiCamera.ignore(this.baseLayer)
     }

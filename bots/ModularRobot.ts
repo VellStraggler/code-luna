@@ -32,7 +32,6 @@ export default class ModularRobot implements IGameFighter{
     public isDrilling = false
     public guns: ModularPart[] = []
     public wheels: WheelBlock[] = []
-    private miningOverlaps: Phaser.Physics.Arcade.Collider[] = []
 
     private timeIdle = 0
 
@@ -46,7 +45,6 @@ export default class ModularRobot implements IGameFighter{
 
     // Energy
     public baseEnergyUsePerMs = 0
-    public energyUsePerMs = 0;
     public maxCharge = 0
     public baseEnergyNeed = 1
     public maxSpeed = 0;
@@ -65,7 +63,6 @@ export default class ModularRobot implements IGameFighter{
     set storedLunestone(amount: number) {
         this.setStoredResource("storedLunestone", amount)
     }
-    public isMiningThis: HPImage | null = null
     cores = 0;
     canCreate = false;
     canSend = false; canReceive = false;
@@ -163,9 +160,11 @@ export default class ModularRobot implements IGameFighter{
 
     remove(block: ModularBlock) {
         this.blocks = this.blocks.filter(b => !b.equals(block))
+        if (block instanceof WheelBlock) block.resetChassis()
         if(this.proxyGlobalBlock == block) {
             this.proxyGlobalBlock = this.blocks[0] ?? null
         }
+        this.updateChassis()
         console.log("length after: " + this.blocks.length)
         return block
     }
@@ -235,20 +234,17 @@ export default class ModularRobot implements IGameFighter{
     }
 
     private resetAbilities() {
-        this.miningOverlaps.forEach(overlap => overlap.destroy())
-        this.miningOverlaps = []
+        this.stopDrilling()
         this.parts = []
         this.guns = []
         this.wheels = []
         this.latestCpuPart = null
         this.latestDrillPart = null
-        this.isMiningThis = null
         this.objectCounts = {}
         this.weight = 0
         this.storageSpace = 0
         this.gasCost = 0
         this.stoneCost = 0
-        this.energyUsePerMs = 0
         this.wheelCount = 0
         this.maxSpeed = 0
         this.maxCharge = 0
@@ -419,15 +415,19 @@ export default class ModularRobot implements IGameFighter{
                 this.addToObjectCounts(part.assetKey)
             }
             
-            // getting chassis rotation:
-            for (const wheel of this.wheels) {
-                for(const block of this.blocks) {
-                    if (block.assetKey == BLOCK_WHEEL_NAME) continue
-                    let diff = wheel.localPos.subtract(block.localPos)
-                    if(Math.abs(diff.x) + Math.abs(diff.y) == BLOCK_RES) {
-                        const dir = GameGeometry.directionBetween(block.localPos, wheel.localPos)
-                        wheel.rotateChassis(dir)
-                    }
+        }
+    }
+
+    private updateChassis() {
+        for (const wheel of this.blocks) {
+            if (!(wheel instanceof WheelBlock)) continue
+            wheel.resetChassis()
+            for (const block of this.blocks) {
+                if (block instanceof WheelBlock) continue
+                const diff = block.localPos.subtract(wheel.localPos)
+                if ((Math.abs(diff.x) == BLOCK_RES && diff.y == 0) ||
+                    (Math.abs(diff.y) == BLOCK_RES && diff.x == 0)) {
+                    wheel.createChassis(GameGeometry.directionBetween(wheel.localPos, block.localPos))
                 }
             }
         }
@@ -437,7 +437,7 @@ export default class ModularRobot implements IGameFighter{
         this.parts.push(part)
         switch (part.assetKey) {
             case PART_DRILL_NAME:
-                this.allowMining(this.scene.cosmoriteOre, part)
+                this.latestDrillPart = part
                 break
             case PART_CPU_NAME:
                 this.latestCpuPart = part as CpuPart
@@ -447,12 +447,6 @@ export default class ModularRobot implements IGameFighter{
                 this.guns.push(part)
             default:
                 break
-        }
-    }
-
-    notifyOfCosmorite() {
-        if (this.latestDrillPart != null) {
-            this.allowMining(this.scene.cosmoriteOre, this.latestDrillPart)
         }
     }
 
@@ -471,6 +465,7 @@ export default class ModularRobot implements IGameFighter{
     public reload(): ModularRobot {
         this.resetAbilities()
         this.recordBlockData()
+        this.updateChassis()
         this.evaluateAbilities()
         return this
     }
@@ -512,11 +507,10 @@ export default class ModularRobot implements IGameFighter{
             animateBlock = false
         }
 
-        this.mine(delta)
-
         for (const block of this.blocks) {
             block.update(animateBlock)
         }
+        this.mine(delta)
         if (this.lastPos.x != this.position.x || this.lastPos.y != this.position.y) {
             this.movingDirectionRadians = Phaser.Math.Angle.Between(this.lastPos.x, this.lastPos.y, this.position.x, this.position.y)
         }
@@ -570,18 +564,34 @@ export default class ModularRobot implements IGameFighter{
         return this
     }
 
-    public canMine(): Boolean {
-        return (this.hasDrill() && this.hasCpu() && this.isMiningThis != null)
+    public canMine(): boolean {
+        return this.hasCpu() && this.getTouchingDrill() != null
+    }
+
+    private getTouchingDrill(): ModularPart | null {
+        const ore = this.scene.cosmoriteOre
+        if (!ore?.active || !ore.visible || !ore.body?.enable) return null
+        const oreBounds = ore.getBounds()
+        return this.parts.find(part =>
+            part.assetKey === PART_DRILL_NAME &&
+            part.parentBlock.robot === this &&
+            this.blocks.includes(part.parentBlock) &&
+            part.image.active && part.image.visible && part.image.body?.enable &&
+            Phaser.Geom.Intersects.RectangleToRectangle(part.image.getBounds(), oreBounds)
+        ) ?? null
     }
 
     public mine(delta:number) {
-        if (this.canMine()) {
+        const drill = this.getTouchingDrill()
+        if (this.hasCpu() && drill) {
             const minedAmount = (MINING_RATE_MS * delta)/1000
             if(this.storageSpace >= this.storedLunestone + this.storedCosmorite + minedAmount) {
-                this.latestDrillPart?.activate()
+                this.latestDrillPart?.deactivate()
+                this.latestDrillPart = drill
+                drill.activate()
                 this.storedCosmorite += minedAmount * GAS_MINE_RATE
                 this.storedLunestone += minedAmount * STONE_MINE_RATE
-                this.isMiningThis?.takeDamage(minedAmount)
+                this.scene.cosmoriteOre.takeDamage(minedAmount)
                 this.isDrilling = true
             } else {
                 this.stopDrilling()
@@ -589,7 +599,6 @@ export default class ModularRobot implements IGameFighter{
         } else {
             this.stopDrilling()
         }
-        this.isMiningThis = null
     }
 
     private stopDrilling() {
@@ -614,9 +623,6 @@ export default class ModularRobot implements IGameFighter{
             }
             newRobot.addBlock(newBlock)
         }
-        for (const other of this.scene.robots) {
-            this.scene.physics.add.collider(other.blocks[0].image, newRobot.blocks[0].image)
-        }
         return newRobot.reload()
     }
 
@@ -631,22 +637,16 @@ export default class ModularRobot implements IGameFighter{
             if (part instanceof CpuPart) part.sourceRobot = this
             part.update(false)
         }
+        block.updateFreshness()
 
         if(this.blocks.length == 0) {
             this.proxyGlobalBlock = block
         }
         this.blocks.push(block)
+        this.updateChassis()
         this.scene.uiCamera.ignore(block.image)
-        this.scene.robots?.allowOffloading(this)
+        this.scene.robots?.registerBlocks(this)
         return this
-    }
-
-    private allowMining(cosmoriteOre: HPImage, drillPart: ModularPart) {
-        this.latestDrillPart = drillPart
-        if (!cosmoriteOre) return
-        this.miningOverlaps.push(this.scene.physics.add.overlap(drillPart.image, cosmoriteOre, () => {
-            this.isMiningThis = cosmoriteOre
-        }))
     }
 
     public addCollider(scene: MainScene, offender: HPImage | Phaser.Physics.Arcade.Image) {
@@ -684,10 +684,6 @@ export default class ModularRobot implements IGameFighter{
                     Math.sin(angle) * this.maxSpeed)
             })
         } 
-    }
-
-    calcTimeLeft() {
-        return this.storedCosmorite / (this.energyUsePerMs * 1000);
     }
 
     public getMeterRange() {

@@ -45,6 +45,11 @@ export class ModularPart extends BaseGameItem {
         this.localPos = ModularPart.localPoses[spots-1][index]
     }
 
+    override rotate(amount: number = 0) {
+        super.rotate(amount)
+        this.parentBlock.updateFreshness()
+    }
+
     /** 0 if part is not activated. */
     public override getEnergyUse() {
         if (this.isActive) {

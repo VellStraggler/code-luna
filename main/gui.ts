@@ -1,12 +1,13 @@
 import MainStats from "./MainStats"
 import MainScene from "../CodeLuna"
-import { xy } from "./xy"
-import { HIDE_POS, GUI_DEPTH, WINDOW, GUI_SIZE, GUI_MARGIN, GUI_TEXT_START, TEXT_SPACING, TOOLBOX_WIDTH, TOOLBOX_SPACING, FACTORY_BLOCK, PART_GUN_NAME, WELDER_PART, F0 } from "./constants"
+import { HIDE_POS, GUI_DEPTH, WINDOW, GUI_SIZE, GUI_SECONDARY_SIZE, GUI_MARGIN, TEXT_SPACING, TOOLBOX_WIDTH, TOOLBOX_SPACING, FACTORY_BLOCK, PART_GUN_NAME, WELDER_PART, F0 } from "./constants"
 import MyColors from "./MyColors"
 import ModularRobot from "../bots/ModularRobot"
 import { GuiState } from "../bots/parts/CpuPart"
 import UIColumn from "./UITextColumn"
-import { PlayerState } from "./Player"
+import RobotFunctionEditor from "./RobotFunctionEditor"
+import FactoryBlock from "../bots/parts/FactoryBlock"
+import FactoryGUI from "./FactoryGUI"
 
 export default class GUI {
     private scene: MainScene
@@ -19,6 +20,9 @@ export default class GUI {
     public baseGUI!: UIColumn
 
     public robotGUI!: UIColumn
+    private robotStatsGUI!: UIColumn
+    private monitorContainer!: Phaser.GameObjects.Container
+    private monitorScreens: Phaser.GameObjects.Container[] = []
 
     public playerTools!: UIColumn
 
@@ -26,6 +30,11 @@ export default class GUI {
     public robotOfCPU: ModularRobot | null = null
     public clickMeOutline: Phaser.GameObjects.Rectangle
     private monitorCloseButton!: Phaser.GameObjects.Text
+    private robotFunctionEditor: RobotFunctionEditor
+    private factoryGUI: FactoryGUI
+    private factoryOfGUI: FactoryBlock | null = null
+    private messageOpenFactoryGUI!: Phaser.GameObjects.Text
+    private factoryOutline!: Phaser.GameObjects.Rectangle
     
     constructor(scene: MainScene, mainStats: MainStats) {
         this.scene = scene
@@ -36,7 +45,17 @@ export default class GUI {
         this.initPlayerTools()
         this.initCommandGUI()
         this.initCpuGUI()
+        this.factoryGUI = new FactoryGUI(this.scene)
+        this.robotFunctionEditor = new RobotFunctionEditor(this.scene)
+        this.monitorScreens[0].add([
+            ...this.baseGUI.getAsGameObjects(),
+            ...this.robotGUI.getAsGameObjects()
+        ])
+        this.monitorScreens[0].add(this.factoryGUI.container)
+        this.monitorScreens[1].add(this.robotStatsGUI.getAsGameObjects())
+        this.layoutMonitor()
         this.initMessageOpenCPU()
+        this.initMessageOpenFactory()
         this.hideAll()
 
         this.clickMeOutline = this.scene.add.rectangle(HIDE_POS.x, HIDE_POS.y, 20, 20)
@@ -49,18 +68,21 @@ export default class GUI {
 
     private initHud() {
         this.hud = new UIColumn(this.scene, TEXT_SPACING, TEXT_SPACING, true)
-            .addIconStatLine('icon-lunestone', 'Lunestone: ', () => this.mainStats.getLunestone())
-            .addIconStatLine('icon-refined-cosmorite', 'Cosmorite Gas: ', () => this.mainStats.getGas())
-            .addIconStatLine('part-battery', 'Energy Use Per Second: ', () => {this.mainStats.getEnergyUseMs() * 1000})
+            .addIconStatLine('icon-lunestone', 'x ', () => this.mainStats.getLunestone())
+            .addIconStatLine('icon-refined-cosmorite', 'x ', () => this.mainStats.getGas())
+            .addIconStatLine('part-battery', 'x ', () => this.mainStats.getEnergyUseMs() * 1000)
     }
 
     private hideAll() {
         this.robotGUI.setVisibility(false)
+        this.robotStatsGUI.setVisibility(false)
         this.baseGUI.setVisibility(false)
+        this.factoryGUI.setVisible(false)
     }
 
     hideGUI() {
         this.hideCpuNotifier()
+        this.hideFactoryNotifier()
     }
 
     private initMessageOpenCPU() {
@@ -77,7 +99,7 @@ export default class GUI {
             _pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData
         ) => {
             event.stopPropagation()
-            if (this.baseGUI.isVisible) return
+            if (this.baseGUI.isVisible || this.factoryGUI.isVisible) return
             const cpu = this.robotOfCPU?.getCpuPart()
             if (!cpu?.isNearPlayer()) return
             cpu.guiState = GuiState.open
@@ -89,6 +111,83 @@ export default class GUI {
             .setVisible(false)
         this.messageOpenRobotGUI.setDepth(GUI_DEPTH + 1)
         this.scene.uiCamera.ignore(this.messageOpenRobotGUI)
+    }
+
+    private initMessageOpenFactory() {
+        this.messageOpenFactoryGUI = this.scene.add.text(HIDE_POS.x, HIDE_POS.y, "open\n\n\nfactory", {
+            fontSize: "32px", color: "#000000", fontStyle: "bold",
+            stroke: "#ffffff", strokeThickness: 4, padding: { x: 12, y: 12 }, align: "center"
+        })
+            .setScale(0.20)
+            .setOrigin(0.5)
+            .setDepth(GUI_DEPTH + 1)
+            .setVisible(false)
+            .setInteractive({ useHandCursor: true })
+            .on("pointerdown", (
+                _pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData
+            ) => {
+                event.stopPropagation()
+                if (this.baseGUI.isVisible || !this.factoryOfGUI?.isNearPlayer()) return
+                this.factoryOfGUI.guiState = GuiState.open
+                this.toggleFactoryGUI(true)
+                this.hideFactoryNotifier()
+            })
+        this.factoryOutline = this.scene.add.rectangle(HIDE_POS.x, HIDE_POS.y, 20, 20)
+            .setFillStyle(MyColors.white, 0)
+            .setStrokeStyle(1, MyColors.white)
+            .setDepth(GUI_DEPTH)
+            .setVisible(false)
+        this.scene.uiCamera.ignore([this.messageOpenFactoryGUI, this.factoryOutline])
+    }
+
+    private hideFactoryNotifier() {
+        this.messageOpenFactoryGUI.setPosition(HIDE_POS.x, HIDE_POS.y).setVisible(false)
+        this.factoryOutline.setPosition(HIDE_POS.x, HIDE_POS.y).setVisible(false)
+    }
+
+    private updateFactoryGUI() {
+        let closest: FactoryBlock | null = null
+        let distance = Infinity
+        for (const robot of this.scene.robots) {
+            for (const block of robot.blocks) {
+                if (!(block instanceof FactoryBlock) || !block.image.active || !block.image.body) continue
+                const nextDistance = block.getDistanceToPlayer()
+                if (nextDistance < distance) {
+                    closest = block
+                    distance = nextDistance
+                }
+            }
+        }
+        if (this.factoryOfGUI && this.factoryOfGUI !== closest) {
+            this.factoryOfGUI.guiState = GuiState.closed
+            this.toggleFactoryGUI(false)
+        }
+        this.factoryOfGUI = closest
+        this.factoryGUI.setFactory(closest)
+        if (!closest || this.baseGUI.isVisible || this.robotGUI.isVisible) {
+            if (closest) closest.guiState = GuiState.closed
+            this.hideFactoryNotifier()
+            this.toggleFactoryGUI(false)
+            return
+        }
+        if (closest.guiState === GuiState.open) {
+            if (distance >= 50) closest.guiState = GuiState.closed
+        } else {
+            closest.guiState = closest.isNearPlayer() ? GuiState.notifying : GuiState.closed
+        }
+        if (closest.guiState === GuiState.open) {
+            this.toggleFactoryGUI(true)
+            this.hideFactoryNotifier()
+            this.factoryGUI.update()
+        } else {
+            this.toggleFactoryGUI(false)
+            if (closest.guiState === GuiState.notifying) {
+                this.messageOpenFactoryGUI.setPosition(closest.image.x, closest.image.y).setVisible(true)
+                this.factoryOutline.setPosition(closest.image.x, closest.image.y).setVisible(true)
+            } else {
+                this.hideFactoryNotifier()
+            }
+        }
     }
 
     public hideCpuNotifier() {
@@ -103,17 +202,21 @@ export default class GUI {
 
     update() {
         this.hud.update()
+        this.updateFactoryGUI()
         this.updateRobotGUI()
+        this.robotStatsGUI.update()
+        if (this.robotGUI.isVisible) this.robotFunctionEditor.position(this.monitorScreens[0])
     }
 
     public updateRobotGUI() {
         const previousCpu = this.robotOfCPU?.getCpuPart()
         this.robotOfCPU = this.scene.robots.findRobotClosestToPlayer()
+        this.robotFunctionEditor.setRobot(this.robotOfCPU)
         const cpu = this.robotOfCPU?.getCpuPart()
         this.scene.player.closestCPU = cpu ?? null
         if (previousCpu && previousCpu !== cpu) previousCpu.guiState = GuiState.closed
 
-        if (!cpu || this.baseGUI.isVisible) {
+        if (!cpu || this.baseGUI.isVisible || this.factoryGUI.isVisible) {
             if (cpu) cpu.guiState = GuiState.closed
             this.hideCpuNotifier()
             this.toggleRobotGUI(false)
@@ -147,19 +250,23 @@ export default class GUI {
     }
 
     private initMonitor() {
-        // transparent bounding box
-        let box = this.scene.add.rectangle(
-            WINDOW.x/2, WINDOW.y/2, 
-            GUI_SIZE.x, GUI_SIZE.y, 
-            MyColors.green
-        )
-            .setAlpha(0.6)
-            .setStrokeStyle(2, MyColors.white)
+        this.monitorContainer = this.scene.add.container(0, 0)
+            .setScrollFactor(0)
+            .setDepth(GUI_DEPTH)
             .setVisible(false)
-        this.guiRects.push(box)
+        for (const size of [GUI_SIZE, GUI_SECONDARY_SIZE]) {
+            const screen = this.scene.add.container(0, 0).setSize(size.x, size.y)
+            const box = this.scene.add.rectangle(0, 0, size.x, size.y, MyColors.green)
+                .setOrigin(0, 0)
+                .setAlpha(0.6)
+                .setStrokeStyle(2, MyColors.white)
+            screen.add(box)
+            this.guiRects.push(box)
+            this.monitorScreens.push(screen)
+            this.monitorContainer.add(screen)
+        }
         this.monitorCloseButton = this.scene.add.text(
-            (WINDOW.x + GUI_SIZE.x)/2 - GUI_MARGIN,
-            (WINDOW.y - GUI_SIZE.y)/2 + GUI_MARGIN,
+            0, 0,
             "X",
             { fontSize: "16px", color: "#ffffff", fontStyle: "bold", padding: { x: 4, y: 2 } }
         )
@@ -172,8 +279,41 @@ export default class GUI {
                 _pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData
             ) => {
                 event.stopPropagation()
-                this.closeRobotGUI()
+                if (this.factoryGUI.isVisible) {
+                    if (this.factoryOfGUI) this.factoryOfGUI.guiState = GuiState.closed
+                    this.toggleFactoryGUI(false)
+                    this.hideFactoryNotifier()
+                } else {
+                    this.closeRobotGUI()
+                }
             })
+        this.monitorContainer.add(this.monitorCloseButton)
+    }
+
+    private layoutMonitor() {
+        const factoryOpen = this.factoryGUI.isVisible
+        const sidePadding = factoryOpen ? 32 : 0
+        const topPadding = Math.max(this.monitorCloseButton.height + GUI_MARGIN + GUI_MARGIN / 2, sidePadding)
+        const columns = factoryOpen ? [] :
+            this.baseGUI.isVisible ? [this.baseGUI] : [this.robotGUI, this.robotStatsGUI]
+        const sizes = [GUI_SIZE, GUI_SECONDARY_SIZE]
+        let screenHeight = 0
+        let width = sidePadding
+        for (const [index, screen] of this.monitorScreens.entries()) {
+            screen.setVisible(!factoryOpen || index === 0)
+            if (factoryOpen && index !== 0) continue
+            const size = sizes[index]
+            const height = Math.max(size.y, (columns[index]?.latestY ?? 0) + GUI_MARGIN)
+            screen.setPosition(width, topPadding).setSize(size.x, height)
+            this.guiRects[index].setSize(size.x, height)
+            screenHeight = Math.max(screenHeight, height)
+            width += screen.width + TEXT_SPACING
+        }
+        width += sidePadding - TEXT_SPACING
+        const height = topPadding + screenHeight + (factoryOpen ? sidePadding : GUI_MARGIN)
+        this.monitorContainer.setSize(width, height)
+            .setPosition((WINDOW.x - width) / 2, (WINDOW.y - height) / 2)
+        this.monitorCloseButton.setPosition(width, GUI_MARGIN)
     }
 
     private initPlayerTools() {
@@ -193,33 +333,37 @@ export default class GUI {
     }
 
     private initCpuGUI() {
-        this.robotGUI = new UIColumn(this.scene, GUI_TEXT_START.x, GUI_TEXT_START.y, false)
-            .addStatLine("blocks: ", () => this.robotOfCPU?.blocks.length)
-            .addStatLine("stored lunestone: ", () => this.robotOfCPU?.storedLunestone)
-            .addStatLine("stored cosmorite: ", () => this.robotOfCPU?.storedCosmorite)
-            .addStatLine("storage limit: ", () => this.robotOfCPU?.storageSpace)
-            .addStatLine("seconds left: ", () => this.robotOfCPU?.calcTimeLeft())
-            .addStatLine("Estimated range (m): ", () => this.robotOfCPU?.getMeterRange())
-            .addButtonLine("sendToMine", () => this.robotOfCPU?.setGoal(this.scene.debug_getMineSiteXY()))
-            .addButtonLine("sendHome", () => this.robotOfCPU?.setGoal(this.scene.playerBase.getPosition()))
+        this.robotGUI = new UIColumn(this.scene, GUI_MARGIN, GUI_MARGIN, false)
+        this.robotStatsGUI = new UIColumn(this.scene, GUI_MARGIN, GUI_MARGIN, false)
+            .addTextLine("storage:")
+            .addIconStatLine('icon-lunestone', 'x ', () => this.robotOfCPU?.storedLunestone)
+            .addIconStatLine('icon-refined-cosmorite', 'x ', () => this.robotOfCPU?.storedCosmorite)
+            .addIconStatLine('part-battery', 'x ', () => this.robotOfCPU?.getCalculatedEnergyUse())
+            .addTextLine("blocks:")
+            .addStatLine(" ", () => String(this.robotOfCPU?.blocks.length ?? 0))
+            .addTextLine("meter range:")
+            .addStatLine(" ", () => this.robotOfCPU?.getMeterRange())
+            .addTextLine("capacity:")
+            .addStatLine(" ", () => {
+                const robot = this.robotOfCPU
+                const stored = robot ? robot.storedLunestone + robot.storedCosmorite : 0
+                return `${stored.toFixed(1)} / ${(robot?.storageSpace ?? 0).toFixed(1)}`
+            })
+            .setFontSize(12, GUI_SECONDARY_SIZE.x - GUI_MARGIN * 2)
     }
 
     private initCommandGUI() {
-        this.baseGUI = new UIColumn(this.scene, GUI_TEXT_START.x, GUI_TEXT_START.y, false)
+        this.baseGUI = new UIColumn(this.scene, GUI_MARGIN, GUI_MARGIN, false)
             .addButtonLine("Build bot", () => {this.scene.debug_summonRobot()})
-            // .addButtonLine("Locate Mineral Site: ", () => {this.scene.debug_getMineSiteString()})
-            .addButtonLine("Move 100 UP    ^: ", () => {this.scene.robots.debug_moveAllRobots(0,-100)})
-            .addButtonLine("Move 100 DOWN  v: ", () => {this.scene.robots.debug_moveAllRobots(0,100)})
-            .addButtonLine("Move 100 LEFT  <: ", () => {this.scene.robots.debug_moveAllRobots(-100,0)})
-            .addButtonLine("Move 100 RIGHT >: ", () => {this.scene.robots.debug_moveAllRobots(100,0)})
+            .addButtonLine("Move all 100 UP    ^: ", () => {this.scene.robots.debug_moveAllRobots(0,-100)})
+            .addButtonLine("Move all 100 DOWN  v: ", () => {this.scene.robots.debug_moveAllRobots(0,100)})
+            .addButtonLine("Move all 100 LEFT  <: ", () => {this.scene.robots.debug_moveAllRobots(-100,0)})
+            .addButtonLine("Move all 100 RIGHT >: ", () => {this.scene.robots.debug_moveAllRobots(100,0)})
     }
 
     public getUILayer(): Phaser.GameObjects.Layer  {
         const uiLayer = this.scene.add.layer(this.hud.getAsGameObjects())
-        uiLayer.add(this.baseGUI.getAsGameObjects())
-        uiLayer.add(this.robotGUI.getAsGameObjects())
-        uiLayer.add(this.guiRects)
-        uiLayer.add(this.monitorCloseButton)
+        uiLayer.add(this.monitorContainer)
         return uiLayer
     }
 
@@ -230,15 +374,38 @@ export default class GUI {
         this.hideCpuNotifier()
     }
 
+    get isFactoryOpen() {
+        return this.factoryGUI.isVisible
+    }
+
+    private toggleFactoryGUI(visible: boolean) {
+        if (visible && this.baseGUI.isVisible) return
+        if (this.factoryGUI.isVisible === visible) return
+        if (visible) {
+            const cpu = this.robotOfCPU?.getCpuPart()
+            if (cpu) cpu.guiState = GuiState.closed
+            this.robotGUI.setVisibility(false)
+            this.robotStatsGUI.setVisibility(false)
+            this.hideCpuNotifier()
+        }
+        this.factoryGUI.setVisible(visible)
+        this.playerTools.setVisibility(!visible && !this.baseGUI.isVisible && !this.robotGUI.isVisible)
+        this.toggleScreen()
+    }
+
     public toggleBaseGUI(visible:boolean) {
         if (visible) {
             this.hideCpuNotifier()
+            this.hideFactoryNotifier()
+            if (this.factoryOfGUI) this.factoryOfGUI.guiState = GuiState.closed
+            this.factoryGUI.setVisible(false)
             const cpu = this.robotOfCPU?.getCpuPart()
             if (cpu) cpu.guiState = GuiState.closed
         }
         if(this.baseGUI.isVisible == visible) return
         if (visible) {
             this.robotGUI.setVisibility(false)
+            this.robotStatsGUI.setVisibility(false)
             this.playerTools.setVisibility(false)
         } else {
             this.playerTools.setVisibility(true)
@@ -248,7 +415,7 @@ export default class GUI {
     }
     
     public toggleRobotGUI(visible: boolean) {
-        if (visible && this.baseGUI.isVisible) return
+        if (visible && (this.baseGUI.isVisible || this.factoryGUI.isVisible)) return
         if(this.robotGUI.isVisible == visible) return
         if (visible) {
             this.baseGUI.setVisibility(false)
@@ -257,15 +424,20 @@ export default class GUI {
             this.playerTools.setVisibility(true)
         }
         this.robotGUI.setVisibility(visible)
+        this.robotStatsGUI.setVisibility(visible)
         this.toggleScreen()
     }
 
     public toggleScreen() {
         let setVisible = false
-        if (this.robotGUI.isVisible || this.baseGUI.isVisible) {
+        if (this.robotGUI.isVisible || this.baseGUI.isVisible || this.factoryGUI.isVisible) {
             setVisible = true
         }
-        this.guiRects[0].setVisible(setVisible)
-        this.monitorCloseButton.setVisible(this.robotGUI.isVisible)
+        this.monitorContainer.setVisible(setVisible)
+        this.monitorCloseButton.setVisible(this.robotGUI.isVisible || this.factoryGUI.isVisible)
+        if (setVisible) this.layoutMonitor()
+        this.robotFunctionEditor.setRobot(this.robotOfCPU)
+        if (this.robotGUI.isVisible) this.robotFunctionEditor.position(this.monitorScreens[0])
+        this.robotFunctionEditor.setVisible(this.robotGUI.isVisible)
     }
 }

@@ -1,5 +1,5 @@
 import {XY, xy} from "../../main/xy"
-import { BLOCK_DEPTH, BLOCK_RES, DEFAULT_DRAG, DIRECTION_OFFSETS, Dirs, generateId, MAX_SPEED, PART_CPU_NAME } from "../../main/constants";
+import { BLOCK_DEPTH, BLOCK_FRESHNESS_MS, BLOCK_FRESHNESS_START_WHITENESS, BLOCK_RES, DEFAULT_DRAG, DIRECTION_OFFSETS, generateId, MAX_SPEED, PART_CPU_NAME } from "../../main/constants";
 import { ModularPart } from "./ModularPart";
 import { BlockDefinition } from "./BlockDefinition";
 import MainScene from "../../CodeLuna";
@@ -21,6 +21,9 @@ export default class ModularBlock extends BaseGameItem {
     storedCosmorite = 0
     storedLunestone = 0
     hp = 0
+    readonly createdAt: number
+    printedBy: ModularBlock | null = null
+    private freshnessImages = new Map<Phaser.GameObjects.Image, Phaser.GameObjects.Image>()
 
     constructor(
         scene: MainScene,
@@ -43,16 +46,63 @@ export default class ModularBlock extends BaseGameItem {
         this.robot = robot
         this.localPos = localPos
         this.blockType = blockType
+        this.createdAt = scene.time.now
         this.resetHP()
 
         this.image.setBodySize(BLOCK_RES-2, BLOCK_RES-2, true)
             .setDrag(DEFAULT_DRAG)
             .setDepth(BLOCK_DEPTH)
         scene.baseLayer.push(this.image)
+        this.updateFreshness()
+    }
+
+    get isFresh() {
+        return this.scene.time.now - this.createdAt < BLOCK_FRESHNESS_MS
+    }
+
+    protected getFreshnessSources(): Phaser.GameObjects.Image[] {
+        return [this.image, ...this.modularParts.map(part => part.image)]
+    }
+
+    public updateFreshness() {
+        if (!this.isFresh) {
+            for (const overlay of this.freshnessImages.values()) overlay.destroy()
+            this.freshnessImages.clear()
+            return
+        }
+        const alpha = BLOCK_FRESHNESS_START_WHITENESS *
+            Math.pow(1 - (this.scene.time.now - this.createdAt) / BLOCK_FRESHNESS_MS, 3)
+        for (const image of this.getFreshnessSources()) {
+            let overlay = this.freshnessImages.get(image)
+            if (!overlay) {
+                overlay = this.scene.add.image(image.x, image.y, image.texture.key, image.frame.name)
+                    .setTint(0xffffff)
+                    .setTintMode(Phaser.TintModes.FILL)
+                this.freshnessImages.set(image, overlay)
+                this.scene.uiCamera.ignore(overlay)
+                this.scene.baseLayer.push(overlay)
+            }
+            overlay.setTexture(image.texture.key, image.frame.name)
+                .setPosition(image.x, image.y)
+                .setRotation(image.rotation)
+                .setScale(image.scaleX, image.scaleY)
+                .setOrigin(image.originX, image.originY)
+                .setDepth(image.depth + 1)
+                .setVisible(image.visible)
+                .setAlpha(alpha * image.alpha)
+        }
+    }
+
+    public canAutoConnectTo(other: ModularBlock): boolean {
+        if (this.robot === other.robot || (!this.isFresh && !other.isFresh)) return false
+        if (this.blockType === BlockDefinition.wheel && other.blockType === BlockDefinition.wheel) return false
+        return !this.robot.blocks.some(block => block.printedBy?.robot === other.robot) &&
+            !other.robot.blocks.some(block => block.printedBy?.robot === this.robot)
     }
 
     public connectRobotAt(otherBlock: ModularBlock): boolean {
         if (this.robot === otherBlock.robot) return false
+        if (this.blockType === BlockDefinition.wheel && otherBlock.blockType === BlockDefinition.wheel) return false
 
         const dx = otherBlock.image.x - this.image.x
         const dy = otherBlock.image.y - this.image.y
@@ -76,9 +126,6 @@ export default class ModularBlock extends BaseGameItem {
      * assumed as already assigned
      */
     public connectBlock(block: this, dir: string = "") {
-        block.globalPos = this.globalPos // from source block
-        this.robot.addBlock(block)
-        
         if (dir!="") {
             let offset = DIRECTION_OFFSETS[0]
             switch(dir){
@@ -98,10 +145,10 @@ export default class ModularBlock extends BaseGameItem {
             block.localPos = this.localPos.add(offset.multiply(BLOCK_RES))
         }
 
+        this.robot.addBlock(block)
+        this.robot.reload()
         block.update(this.scene.animateScene)
     }
-
-    rotateChassis(dir: Dirs) {}
 
     addPart(scene: MainScene, partType: PartDefinition, robot: ModularRobot | undefined = undefined):this {
         let part!: ModularPart
@@ -114,6 +161,7 @@ export default class ModularBlock extends BaseGameItem {
         this.modularParts.push(part)
         this.scene.uiCamera.ignore(part.image)
         this.updateDamageTint()
+        this.updateFreshness()
         return this
     }
     
@@ -182,6 +230,8 @@ export default class ModularBlock extends BaseGameItem {
     }
 
     override destroy() {
+        for (const overlay of this.freshnessImages.values()) overlay.destroy()
+        this.freshnessImages.clear()
         this.modularParts.forEach(part => part.destroy())
         this.modularParts = []
         super.destroy()
@@ -212,6 +262,7 @@ export default class ModularBlock extends BaseGameItem {
         for(const part of this.modularParts) {
             part.update(animateScene)
         }
+        this.updateFreshness()
 
     }
 }

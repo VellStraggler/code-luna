@@ -103,7 +103,8 @@ export default class UIStatLine extends UITextLine {
     }
 
     public override updateState(): string {
-        return this.statObject.text = (Math.round(this.getVariable() * 10) / 10).toString()
+        const value = this.getVariable() ?? 0
+        return this.statObject.text = typeof value === "number" ? value.toFixed(1) : String(value)
     }
 
     public override getObjects(): (Phaser.GameObjects.Text | Phaser.GameObjects.Image)[] {

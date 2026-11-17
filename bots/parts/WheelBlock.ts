@@ -1,14 +1,13 @@
 import MainScene from "../../CodeLuna";
-import { BLOCK_DEPTH, BLOCK_RES, Dirs, ENERGY_MS_PER_WHEEL, WHEEL_CHASSIS_NAME } from "../../main/constants";
-import GameGeometry from "../../main/GameGeometry";
-import { xy, XY } from "../../main/xy";
+import { BLOCK_DEPTH, Dirs, ENERGY_MS_PER_WHEEL, WHEEL_CHASSIS_NAME } from "../../main/constants";
+import { XY } from "../../main/xy";
 import ModularRobot from "../ModularRobot";
 import { BlockDefinition } from "./BlockDefinition";
 import ModularBlock from "./ModularBlock";
 import * as Phaser from 'phaser'
 
 export default class WheelBlock extends ModularBlock {
-    chassisImage: Phaser.Physics.Arcade.Image | null
+    chassisImages: Partial<Record<Dirs, Phaser.GameObjects.Image>> = {}
 
     constructor(scene: MainScene, position: XY, robot: ModularRobot) {
         super(
@@ -17,54 +16,73 @@ export default class WheelBlock extends ModularBlock {
             BlockDefinition.wheel,
             robot
         )
-        this.chassisImage = null
-        this.createChassis(Dirs.down)
     }
 
     public createChassis(dir: Dirs): void {
-        let x = this.globalPos.x
-        let y = this.globalPos.y
-        
-        this.chassisImage = this.scene.physics.add.image(x, y, WHEEL_CHASSIS_NAME)
-            .setBodySize(BLOCK_RES-2, BLOCK_RES-2, true)
-            .setDepth(BLOCK_DEPTH + 50)
-        this.scene.uiCamera.ignore(this.chassisImage)
-        this.scene.baseLayer.push(this.chassisImage)
-        this.rotateChassis(dir)
+        let chassis = this.chassisImages[dir]
+        if (!chassis) {
+            chassis = this.scene.add.image(this.globalPos.x, this.globalPos.y, WHEEL_CHASSIS_NAME)
+                .setDepth(BLOCK_DEPTH + 50)
+            this.chassisImages[dir] = chassis
+            this.scene.uiCamera.ignore(chassis)
+            this.scene.baseLayer.push(chassis)
+        }
+        chassis.setPosition(this.globalPos.x, this.globalPos.y)
+            .setRotation(this.determineChassisRotation(dir))
+            .setVisible(true)
         this.updateDamageTint()
+        this.updateFreshness()
+    }
+
+    public resetChassis() {
+        for (const chassis of Object.values(this.chassisImages)) {
+            chassis?.setVisible(false)
+        }
+        this.updateFreshness()
+    }
+
+    protected override getFreshnessSources(): Phaser.GameObjects.Image[] {
+        return [
+            ...super.getFreshnessSources(),
+            ...Object.values(this.chassisImages ?? {}).filter(
+                (image): image is Phaser.GameObjects.Image => image !== undefined
+            )
+        ]
     }
 
     override updateDamageTint() {
         super.updateDamageTint()
-        if (this.image.isTinted) {
-            this.chassisImage?.setTint(this.image.tintTopLeft)
-        } else {
-            this.chassisImage?.clearTint()
+        for (const chassis of Object.values(this.chassisImages ?? {})) {
+            if (this.image.isTinted) {
+                chassis?.setTint(this.image.tintTopLeft)
+            } else {
+                chassis?.clearTint()
+            }
         }
     }
 
     public override destroy() {
-        this.chassisImage?.destroy()
-        this.chassisImage = null
+        for (const chassis of Object.values(this.chassisImages)) {
+            chassis?.destroy()
+        }
+        this.chassisImages = {}
         super.destroy()
     }
     
-    public override rotateChassis(dir: Dirs): void {
-        this.chassisImage?.setRotation(this.determineChassisRotation(dir))
-    }
     private determineChassisRotation(dir: Dirs): number {
+        // The chassis artwork points down before rotation.
         let baseRotation = 0
         switch (dir) {
             case (Dirs.left):
-                baseRotation =3
-                break
-            case (Dirs.right):
                 baseRotation = 1
                 break
-            case (Dirs.down):
+            case (Dirs.right):
+                baseRotation = 3
+                break
+            case (Dirs.up):
                 baseRotation = 2
                 break
-            default: //up
+            default: //down
                 break
         }
         
@@ -76,10 +94,13 @@ export default class WheelBlock extends ModularBlock {
 
         let newx = this.globalPos.x
         let newy = this.globalPos.y
-        this.chassisImage?.setPosition(newx, newy)
+        for (const chassis of Object.values(this.chassisImages)) {
+            chassis?.setPosition(newx, newy)
+        }
 
         if (this.robot != null) {
             this.image.setRotation(this.robot.movingDirectionRadians)
+            this.updateFreshness()
         }
 
     }

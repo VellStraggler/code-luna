@@ -14,6 +14,8 @@ export default class UIColumn {
     public isVisible: boolean
     public backgroundRect: Phaser.GameObjects.Rectangle | null
     public readonly align: string
+    private fontSize = 16
+    private maxTextWidth = Infinity
 
     constructor(
         scene: MainScene, 
@@ -105,10 +107,44 @@ export default class UIColumn {
         return this
     }
 
+    public addTextLine(msg: string) {
+        this.list.push(
+            new UITextLine(
+                this.scene, this.x, this.latestY, msg, this.align
+            )
+        )
+        this.latestY += TEXT_SPACING
+        return this
+    }
+
     public update() {
         for (const uiText of this.list) {
             uiText.updateState()
         }
+        if (Number.isFinite(this.maxTextWidth)) {
+            this.setFontSize(this.fontSize, this.maxTextWidth)
+        }
+    }
+
+    public setFontSize(size: number, maxWidth: number = Infinity) {
+        this.fontSize = size
+        this.maxTextWidth = maxWidth
+        for (const line of this.list) {
+            const textObjects = line instanceof UIStatLine
+                ? [line.textObject, line.statObject]
+                : [line.textObject]
+            textObjects.forEach(text => text.setFontSize(size))
+            const textWidth = textObjects.reduce((width, text) => width + text.width, 0)
+            const availableWidth = maxWidth - (line.textObject.x - this.x)
+            if (textWidth > availableWidth) {
+                const fittedSize = Math.max(1, Math.floor(size * availableWidth / textWidth))
+                textObjects.forEach(text => text.setFontSize(fittedSize))
+            }
+            if (line instanceof UIStatLine) {
+                line.statObject.setX(line.textObject.x + line.textObject.width)
+            }
+        }
+        return this
     }
 
     public addIconButton(iconName: string, fun: () => boolean) {
