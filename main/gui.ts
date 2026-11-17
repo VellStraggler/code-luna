@@ -1,6 +1,6 @@
 import MainStats from "./MainStats"
 import MainScene from "../CodeLuna"
-import { HIDE_POS, GUI_DEPTH, WINDOW, GUI_SIZE, GUI_SECONDARY_SIZE, GUI_MARGIN, TEXT_SPACING, TOOLBOX_WIDTH, TOOLBOX_SPACING, FACTORY_BLOCK, PART_GUN_NAME, WELDER_PART, F0 } from "./constants"
+import { HIDE_POS, GUI_DEPTH, WINDOW, GUI_SIZE, GUI_SECONDARY_SIZE, GUI_MARGIN, TEXT_SPACING, TOOLBOX_WIDTH, TOOLBOX_SPACING, FACTORY_BLOCK, PART_GUN_NAME, WELDER_PART, F0, RESOURCE_TRANSFER_AMOUNT, RESOURCE_TRANSFER_INTERVAL_MS } from "./constants"
 import MyColors from "./MyColors"
 import ModularRobot from "../bots/ModularRobot"
 import { GuiState } from "../bots/parts/CpuPart"
@@ -8,6 +8,8 @@ import UIColumn from "./UITextColumn"
 import RobotFunctionEditor from "./RobotFunctionEditor"
 import FactoryBlock from "../bots/parts/FactoryBlock"
 import FactoryGUI from "./FactoryGUI"
+
+type RobotResource = "storedLunestone" | "storedCosmorite"
 
 export default class GUI {
     private scene: MainScene
@@ -35,6 +37,14 @@ export default class GUI {
     private factoryOfGUI: FactoryBlock | null = null
     private messageOpenFactoryGUI!: Phaser.GameObjects.Text
     private factoryOutline!: Phaser.GameObjects.Rectangle
+    private robotResourceButtons: Phaser.GameObjects.Text[] = []
+    private resourceTransferHold: {
+        pointer: Phaser.Input.Pointer
+        robot: ModularRobot
+        resource: RobotResource
+        direction: 1 | -1
+        nextTransferAt: number
+    } | null = null
     
     constructor(scene: MainScene, mainStats: MainStats) {
         this.scene = scene
@@ -52,7 +62,10 @@ export default class GUI {
             ...this.robotGUI.getAsGameObjects()
         ])
         this.monitorScreens[0].add(this.factoryGUI.container)
-        this.monitorScreens[1].add(this.robotStatsGUI.getAsGameObjects())
+        this.monitorScreens[1].add([
+            ...this.robotStatsGUI.getAsGameObjects(),
+            ...this.robotResourceButtons
+        ])
         this.layoutMonitor()
         this.initMessageOpenCPU()
         this.initMessageOpenFactory()
@@ -204,6 +217,7 @@ export default class GUI {
         this.hud.update()
         this.updateFactoryGUI()
         this.updateRobotGUI()
+        this.updateResourceTransfer()
         this.robotStatsGUI.update()
         if (this.robotGUI.isVisible) this.robotFunctionEditor.position(this.monitorScreens[0])
     }
@@ -336,8 +350,9 @@ export default class GUI {
         this.robotGUI = new UIColumn(this.scene, GUI_MARGIN, GUI_MARGIN, false)
         this.robotStatsGUI = new UIColumn(this.scene, GUI_MARGIN, GUI_MARGIN, false)
             .addTextLine("storage:")
-            .addIconStatLine('icon-lunestone', 'x ', () => this.robotOfCPU?.storedLunestone)
-            .addIconStatLine('icon-refined-cosmorite', 'x ', () => this.robotOfCPU?.storedCosmorite)
+        this.addRobotResourceRow("storedLunestone", "icon-lunestone")
+        this.addRobotResourceRow("storedCosmorite", "icon-refined-cosmorite")
+        this.robotStatsGUI
             .addIconStatLine('part-battery', 'x ', () => this.robotOfCPU?.getCalculatedEnergyUse())
             .addTextLine("blocks:")
             .addStatLine(" ", () => String(this.robotOfCPU?.blocks.length ?? 0))
@@ -350,6 +365,71 @@ export default class GUI {
                 return `${stored.toFixed(1)} / ${(robot?.storageSpace ?? 0).toFixed(1)}`
             })
             .setFontSize(12, GUI_SECONDARY_SIZE.x - GUI_MARGIN * 2)
+    }
+
+    private addRobotResourceRow(resource: RobotResource, icon: string) {
+        const y = this.robotStatsGUI.latestY
+        this.robotStatsGUI.addIconStatLine(icon, "x ", () => this.robotOfCPU?.[resource], 40)
+        for (const [index, direction] of ([1, -1] as const).entries()) {
+            const button = this.scene.add.text(
+                GUI_SECONDARY_SIZE.x - GUI_MARGIN - 36 + index * 18, y,
+                direction === 1 ? "+" : "-",
+                { fontSize: "14px", fontStyle: "bold", color: "#ffffff", align: "center" }
+            )
+                .setFixedSize(18, TEXT_SPACING)
+                .setScrollFactor(0)
+                .setDepth(GUI_DEPTH)
+                .setVisible(false)
+                .setInteractive({ useHandCursor: true })
+                .on("pointerdown", (
+                    pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData
+                ) => {
+                    event.stopPropagation()
+                    const robot = this.robotOfCPU
+                    if (!pointer.leftButtonDown() || !this.robotGUI.isVisible || !robot) return
+                    this.resourceTransferHold = {
+                        pointer, robot, resource, direction,
+                        nextTransferAt: this.scene.time.now + RESOURCE_TRANSFER_INTERVAL_MS
+                    }
+                    this.transferRobotResource(robot, resource, direction)
+                })
+            const stopTransfer = (pointer: Phaser.Input.Pointer) => {
+                if (this.resourceTransferHold?.pointer === pointer) this.resourceTransferHold = null
+            }
+            button.on("pointerup", stopTransfer).on("pointerout", stopTransfer)
+            this.robotResourceButtons.push(button)
+        }
+    }
+
+    private updateResourceTransfer() {
+        const held = this.resourceTransferHold
+        if (!held) return
+        if (!held.pointer.leftButtonDown() || !this.robotGUI.isVisible || this.robotOfCPU !== held.robot) {
+            this.resourceTransferHold = null
+            return
+        }
+        while (this.scene.time.now >= held.nextTransferAt) {
+            this.transferRobotResource(held.robot, held.resource, held.direction)
+            held.nextTransferAt += RESOURCE_TRANSFER_INTERVAL_MS
+        }
+    }
+
+    private transferRobotResource(robot: ModularRobot, resource: RobotResource, direction: 1 | -1) {
+        const gas = resource === "storedCosmorite"
+        const available = direction === 1
+            ? gas ? this.mainStats.getGas() : this.mainStats.getLunestone()
+            : robot[resource]
+        if (available + 1e-9 < RESOURCE_TRANSFER_AMOUNT) return
+        if (direction === 1) {
+            const free = robot.blocks.reduce((total, block) => total + Math.max(
+                0, block.blockType.storage - block.storedCosmorite - block.storedLunestone
+            ), 0)
+            if (free + 1e-9 < RESOURCE_TRANSFER_AMOUNT) return
+        }
+        const amount = RESOURCE_TRANSFER_AMOUNT * direction
+        robot[resource] += amount
+        if (gas) this.mainStats.incGas(-amount)
+        else this.mainStats.incLunestone(-amount)
     }
 
     private initCommandGUI() {
@@ -429,6 +509,8 @@ export default class GUI {
     }
 
     public toggleScreen() {
+        this.robotResourceButtons.forEach(button => button.setVisible(this.robotGUI.isVisible))
+        if (!this.robotGUI.isVisible) this.resourceTransferHold = null
         let setVisible = false
         if (this.robotGUI.isVisible || this.baseGUI.isVisible || this.factoryGUI.isVisible) {
             setVisible = true

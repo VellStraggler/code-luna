@@ -46,18 +46,18 @@ export default class UIColumn {
         }
     }
 
-    public addIconStatLine(phaserName: string, msg: string, getVariable: () => any) {
-        this.list.push(
-            new UIIconStatLine(
-                this.scene,
-                this.x,
-                this.latestY,
-                phaserName,
-                msg,
-                getVariable,
-                this.align
-            )
+    public addIconStatLine(phaserName: string, msg: string, getVariable: () => any, reservedWidth: number = 0) {
+        const line = new UIIconStatLine(
+            this.scene,
+            this.x,
+            this.latestY,
+            phaserName,
+            msg,
+            getVariable,
+            this.align
         )
+        line.reservedWidth = reservedWidth
+        this.list.push(line)
         this.latestY += TEXT_SPACING
         return this
     }
@@ -135,7 +135,7 @@ export default class UIColumn {
                 : [line.textObject]
             textObjects.forEach(text => text.setFontSize(size))
             const textWidth = textObjects.reduce((width, text) => width + text.width, 0)
-            const availableWidth = maxWidth - (line.textObject.x - this.x)
+            const availableWidth = maxWidth - (line.textObject.x - this.x) - line.reservedWidth
             if (textWidth > availableWidth) {
                 const fittedSize = Math.max(1, Math.floor(size * availableWidth / textWidth))
                 textObjects.forEach(text => text.setFontSize(fittedSize))

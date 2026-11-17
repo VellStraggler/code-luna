@@ -7,6 +7,7 @@ import { XY, xy } from "./xy"
 export class UITextLine {
     public readonly textObject: Phaser.GameObjects.Text
     public origin: XY = xy()
+    public reservedWidth = 0
 
     constructor(
         scene: MainScene, 

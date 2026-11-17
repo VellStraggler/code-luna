@@ -60,13 +60,14 @@ export const TOOLBOX_SPACING = 8
 // Movement and physics
 export const GAME_SPEED = 8000 / 60
 export const MAX_SPEED = 80
-export const DEFAULT_DRAG = 150
+export const DEFAULT_DRAG = 200
 
 // Update timing and time units
 export const LASER_TEST_MS = 15000
 export const FRAME_TIME_MS = 100
 export const HR_IN_MS = 60*60*1000
 export const BLOCK_FRESHNESS_MS = 10000
+export const RESOURCE_TRANSFER_INTERVAL_MS = 100
 
 // Health and health-bar appearance
 export const HP_BAR_DISPLAY_TIME_MS = 1500
@@ -82,7 +83,7 @@ export const HP_BG_HEIGHT = 6
 export const HP_FG_HEIGHT = 4
 
 // Rendering layers and shadows
-export const BLOCK_FRESHNESS_START_WHITENESS = 0.75
+export const BLOCK_FRESHNESS_START_WHITENESS = 0.8
 export const GUI_DEPTH =    500
 export const GUI_BG_DEPTH = 490
 export const HP_BAR_DEPTH = 400
@@ -92,6 +93,8 @@ export const SHADOW_DEPTH = 100
 export const SHADOW_OFFSET = xy(4,-2)
 
 // Energy storage and consumption
+export const STARTING_GAS_PER_ITEM = 0.1
+export const RESOURCE_TRANSFER_AMOUNT = 0.1
 export const BATTERY_SIZE = 10
 export const ENERGY_USE_MULT = 0.0001
 export const ENERGY_MS_PER_WHEEL = 0.0005 

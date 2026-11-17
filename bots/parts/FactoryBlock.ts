@@ -68,7 +68,6 @@ export default class FactoryBlock extends ModularBlock {
         const printed = ModularRobot.create(this.scene, position.x, position.y, this.selectedBlock)
         const block = printed.blocks[0]
         block.printedBy = this
-        printed.storedCosmorite = 0
         const parts = [...this.selectedParts]
         for (const partType of parts) block.addPart(this.scene, partType, printed)
         block.modularParts.forEach((part, index) => {

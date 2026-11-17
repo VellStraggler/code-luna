@@ -78,7 +78,6 @@ export default class ModularRobot implements IGameFighter{
     static create(scene: MainScene, x: number, y: number, blocktype: BlockDefinition = BlockDefinition.sleek) {
         let newRobot = new this(scene, xy(x,y))
         newRobot.addBlock(BlockBuilder.new(scene, xy(), blocktype, newRobot))
-        newRobot.storedCosmorite = newRobot.baseEnergyNeed
         newRobot.addEnemyCollider(scene.player)
         return newRobot
     }

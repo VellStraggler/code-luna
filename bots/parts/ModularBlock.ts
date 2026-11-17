@@ -1,5 +1,5 @@
 import {XY, xy} from "../../main/xy"
-import { BLOCK_DEPTH, BLOCK_FRESHNESS_MS, BLOCK_FRESHNESS_START_WHITENESS, BLOCK_RES, DEFAULT_DRAG, DIRECTION_OFFSETS, generateId, MAX_SPEED, PART_CPU_NAME } from "../../main/constants";
+import { BLOCK_DEPTH, BLOCK_FRESHNESS_MS, BLOCK_FRESHNESS_START_WHITENESS, BLOCK_RES, DEFAULT_DRAG, DIRECTION_OFFSETS, generateId, MAX_SPEED, PART_CPU_NAME, STARTING_GAS_PER_ITEM } from "../../main/constants";
 import { ModularPart } from "./ModularPart";
 import { BlockDefinition } from "./BlockDefinition";
 import MainScene from "../../CodeLuna";
@@ -18,7 +18,8 @@ export default class ModularBlock extends BaseGameItem {
     modularParts: ModularPart[] = [];
 
     readonly blockType: BlockDefinition;
-    storedCosmorite = 0
+    // Starter gas is available even on blocks without storage.
+    storedCosmorite = STARTING_GAS_PER_ITEM
     storedLunestone = 0
     hp = 0
     readonly createdAt: number
@@ -159,6 +160,7 @@ export default class ModularBlock extends BaseGameItem {
             part = new ModularPart(scene, this, partType.assetKey)
         }
         this.modularParts.push(part)
+        this.storedCosmorite += STARTING_GAS_PER_ITEM
         this.scene.uiCamera.ignore(part.image)
         this.updateDamageTint()
         this.updateFreshness()
