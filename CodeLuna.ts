@@ -2,11 +2,11 @@
 
 import * as Phaser from 'phaser'
 import MainStats from "./player/MainStats"
-import Player, { PlayerState } from "./player/Player"
+import Player from "./player/Player"
 import PlayerBase from "./player/PlayerBase"
 import GUI from "./gui/gui"
 import HPImage from './main/HPImage'
-import { BASIC_ASSET_NAMES, WINDOW, BLOCK_RES, LASER_TEST_MS, FRAME_TIME_MS, BASE_POS, GAME_SPEED, REFINEMENT_RATE_MS, MINING_RATE_MS, GAS_MINE_RATE, STONE_MINE_RATE, COSMORITE_ORE, TWO_FRAME_ASSETS, F1, F0, BLOCK_DEPTH, FACTORY_BLOCK } from './main/constants'
+import { BASIC_ASSET_NAMES, WINDOW, BLOCK_RES, LASER_TEST_MS, FRAME_TIME_MS, BASE_POS, GAME_SPEED, REFINEMENT_RATE_MS, MINING_RATE_MS, GAS_MINE_RATE, STONE_MINE_RATE, COSMORITE_ORE, TWO_FRAME_ASSETS, F1, F0 } from './main/constants'
 import IGameFighter from './bots/contracts/IGameFighter'
 import { XY, xy } from './main/xy'
 import LaserShot from './bots/LaserShot'
@@ -16,26 +16,25 @@ import GameGeometry from './main/GameGeometry'
 import ModularRobot from './bots/ModularRobot'
 import { BlockDefinition } from './bots/parts/BlockDefinition'
 import ModularBlock from './bots/parts/ModularBlock'
-import { PartDefinition } from './bots/parts/PartDefinition'
 
 export default class MainScene extends Phaser.Scene {
-    public player!: Player
+    player!: Player
     private ground!: Phaser.GameObjects.TileSprite
-    public robots!: ModularRobots
-    public lasers: LaserShot[] = []
-    public playerBase!: PlayerBase
-    public cosmoriteOre!: HPImage
-    public mineSites: HPImage[] = []
-    public mainStats!: MainStats
-    public GUI!: GUI
-    public uiCamera!: Phaser.Cameras.Scene2D.Camera
-    public baseLayer: Phaser.GameObjects.GameObject[] = []
+    robots!: ModularRobots
+    lasers: LaserShot[] = []
+    playerBase!: PlayerBase
+    cosmoriteOre!: HPImage
+    mineSites: HPImage[] = []
+    mainStats!: MainStats
+    GUI!: GUI
+    uiCamera!: Phaser.Cameras.Scene2D.Camera
+    baseLayer: Phaser.GameObjects.GameObject[] = []
 
     private controls!: Controls
-    public typing = false
+    typing = false
 
-    public animateScene = false
-    public prevFrameTime: number = 0
+    animateScene = false
+    prevFrameTime: number = 0
     private prevShotTime: number = 0
 
     laserSound!: HTMLAudioElement
@@ -63,10 +62,10 @@ export default class MainScene extends Phaser.Scene {
         this.load.audio("drilling", audioPre + "drilling.wav", {loop: true, volume: 0.5})
         this.load.audio("weld", audioPre + "weld.mp3")
         this.painSound = new Audio(prefix + "audio/pain.mp3")
+        this.drillSound = this.sound.add("drilling", { loop: true, volume: 0.5 })
     }
 
     create() {
-        this.drillSound = this.sound.add("drilling", { loop: true, volume: 0.5 })
         this.input.setTopOnly(true)
         /// CAMERA ///
         const camera = this.cameras.main
