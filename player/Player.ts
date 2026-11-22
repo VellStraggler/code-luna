@@ -1,7 +1,7 @@
 import CpuPart from "../bots/parts/CpuPart";
 import MainScene from "../CodeLuna";
-import { BLOCK_DEPTH } from "./constants";
-import HPImage from "./HPImage";
+import { BLOCK_DEPTH } from "../main/constants";
+import HPImage from "../main/HPImage";
 
 export default class Player extends HPImage {
     playerState: PlayerState = PlayerState.holdingNothing
@@ -15,6 +15,9 @@ export default class Player extends HPImage {
             .setSize(9,12)
             .setDrag(700)
             .setDepth(BLOCK_DEPTH)
+
+        scene.cameras.main.startFollow(this)
+        this.hurtSound = scene.painSound
     }
 
     override updateShadow() {

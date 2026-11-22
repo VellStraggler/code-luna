@@ -33,7 +33,7 @@ export class XY {
     }
 
     toString() {
-        return this.x.toString() + ", " + this.y.toString()
+        return "(" + this.x.toString() + ", " + this.y.toString() + ")"
     }
 
     add(offset: XY | number) {

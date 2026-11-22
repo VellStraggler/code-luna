@@ -1,14 +1,14 @@
-import MainStats from "./MainStats"
+import MainStats from "../player/MainStats"
 import MainScene from "../CodeLuna"
-import { HIDE_POS, GUI_DEPTH, WINDOW, GUI_SIZE, GUI_SECONDARY_SIZE, GUI_MARGIN, TEXT_SPACING, TOOLBOX_WIDTH, TOOLBOX_SPACING, FACTORY_BLOCK, PART_GUN_NAME, WELDER_PART, F0, RESOURCE_TRANSFER_AMOUNT, RESOURCE_TRANSFER_INTERVAL_MS } from "./constants"
-import MyColors from "./MyColors"
+import { HIDE_POS, GUI_DEPTH, WINDOW, GUI_SIZE, GUI_SECONDARY_SIZE, GUI_MARGIN, TEXT_SPACING, TOOLBOX_WIDTH, TOOLBOX_SPACING, FACTORY_BLOCK, PART_GUN_NAME, WELDER_PART, F0, RESOURCE_TRANSFER_AMOUNT, RESOURCE_TRANSFER_INTERVAL_MS } from "../main/constants"
+import MyColors from "../main/MyColors"
 import ModularRobot from "../bots/ModularRobot"
 import CpuPart, { GuiState } from "../bots/parts/CpuPart"
 import UIColumn from "./UITextColumn"
 import RobotFunctionEditor from "./RobotFunctionEditor"
 import FactoryBlock from "../bots/parts/FactoryBlock"
 import FactoryGUI from "./FactoryGUI"
-import { PlayerState } from "./Player"
+import { PlayerState } from "../player/Player"
 
 type RobotResource = "storedLunestone" | "storedCosmorite"
 type NotifierTarget = CpuPart | FactoryBlock

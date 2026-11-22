@@ -1,16 +1,16 @@
 // "npx vite" to run this. Vite starts with index.html
 
 import * as Phaser from 'phaser'
-import MainStats from "./main/MainStats"
-import Player, { PlayerState } from "./main/Player"
-import PlayerBase from "./main/PlayerBase"
-import GUI from "./main/gui"
+import MainStats from "./player/MainStats"
+import Player, { PlayerState } from "./player/Player"
+import PlayerBase from "./player/PlayerBase"
+import GUI from "./gui/gui"
 import HPImage from './main/HPImage'
 import { BASIC_ASSET_NAMES, WINDOW, BLOCK_RES, LASER_TEST_MS, FRAME_TIME_MS, BASE_POS, GAME_SPEED, REFINEMENT_RATE_MS, MINING_RATE_MS, GAS_MINE_RATE, STONE_MINE_RATE, COSMORITE_ORE, TWO_FRAME_ASSETS, F1, F0, BLOCK_DEPTH, FACTORY_BLOCK } from './main/constants'
 import IGameFighter from './bots/contracts/IGameFighter'
 import { XY, xy } from './main/xy'
 import LaserShot from './bots/LaserShot'
-import Controls from './main/Controls'
+import Controls from './player/Controls'
 import ModularRobots from './bots/ModularRobots'
 import GameGeometry from './main/GameGeometry'
 import ModularRobot from './bots/ModularRobot'
@@ -164,15 +164,10 @@ export default class MainScene extends Phaser.Scene {
 
     createPlayer() {
         this.player = new Player(this, 400, 350, 'player/down-f0')
-        this.cameras.main.startFollow(this.player)
-        this.player.hurtSound = this.painSound
     }
 
     createBase(x:number, y:number) {
         this.playerBase = new PlayerBase(this, x, y)
-        this.physics.add.overlap(this.player, this.playerBase, () => {
-            this.playerBase.isOverlapped = true
-        })
     }
     
     update(_time: number, delta: number) {
@@ -263,7 +258,6 @@ export default class MainScene extends Phaser.Scene {
             } else {
                 new LaserShot(this, shooter, [target])
             }
-            // this.mainStats.drainGas(energyCost)
         }
     }
 
@@ -333,13 +327,6 @@ export default class MainScene extends Phaser.Scene {
         newRobot.addEnemyCollider(this.player)
         this.robots.push(newRobot)
         this.uiCamera.ignore(this.baseLayer)
-    }
-    public debug_getMineSiteString() {
-        return "(" + this.cosmoriteOre.getCenter().x.toFixed(0).toString() + ", "
-                + this.cosmoriteOre.getCenter().y.toFixed(0).toString() + ")"
-    }
-    public debug_getMineSiteXY() {
-        return xy(this.cosmoriteOre.getCenter().x, this.cosmoriteOre.getCenter().y)
     }
 }
 

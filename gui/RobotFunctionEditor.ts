@@ -1,6 +1,6 @@
 import type MainScene from "../CodeLuna"
 import type ModularRobot from "../bots/ModularRobot"
-import { GUI_DEPTH, GUI_MARGIN } from "./constants"
+import { GUI_DEPTH, GUI_MARGIN } from "../main/constants"
 
 type RobotFunction = {
     name: string

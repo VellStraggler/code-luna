@@ -1,7 +1,7 @@
 import MainScene from "../CodeLuna";
-import { TEXT_SPACING, TOOLBOX_SPACING, TOOLBOX_WIDTH } from "./constants";
-import GameGeometry from "./GameGeometry";
-import { PlayerState } from "./Player";
+import { TEXT_SPACING, TOOLBOX_SPACING, TOOLBOX_WIDTH } from "../main/constants";
+import GameGeometry from "../main/GameGeometry";
+import { PlayerState } from "../player/Player";
 import UIStatLine, { UIIconButton, UIIconStatLine, UIStatButtonLine, UITextButtonLine, UITextLine } from "./StatMessage";
 
 export default class UIColumn {

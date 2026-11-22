@@ -2,8 +2,8 @@ import MainScene from "../CodeLuna"
 import { BlockDefinition } from "../bots/parts/BlockDefinition"
 import FactoryBlock from "../bots/parts/FactoryBlock"
 import { PartDefinition } from "../bots/parts/PartDefinition"
-import { Dirs, F0, FACTORY_GUI_PADDING, GUI_SIZE, TEXT_SPACING, TOOLBOX_SPACING, TOOLBOX_WIDTH } from "./constants"
-import MyColors from "./MyColors"
+import { Dirs, F0, FACTORY_GUI_PADDING, GUI_SIZE, TEXT_SPACING, TOOLBOX_SPACING, TOOLBOX_WIDTH } from "../main/constants"
+import MyColors from "../main/MyColors"
 
 export default class FactoryGUI {
     readonly container: Phaser.GameObjects.Container
