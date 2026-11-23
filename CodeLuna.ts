@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 // "npx vite" to run this. Vite starts with index.html
 
 import * as Phaser from 'phaser'
@@ -6,16 +7,17 @@ import Player from "./player/Player"
 import PlayerBase from "./player/PlayerBase"
 import GUI from "./gui/gui"
 import HPImage from './main/HPImage'
-import { BASIC_ASSET_NAMES, WINDOW, BLOCK_RES, LASER_TEST_MS, FRAME_TIME_MS, BASE_POS, GAME_SPEED, REFINEMENT_RATE_MS, MINING_RATE_MS, GAS_MINE_RATE, STONE_MINE_RATE, COSMORITE_ORE, TWO_FRAME_ASSETS, F1, F0 } from './main/constants'
+import { BASIC_ASSET_NAMES, WINDOW, BLOCK_RES, LASER_TEST_MS, FRAME_TIME_MS, BASE_POS, GAME_SPEED, REFINEMENT_RATE_MS, MINING_RATE_MS, GAS_MINE_RATE, STONE_MINE_RATE, COSMORITE_ORE, TWO_FRAME_ASSETS, F1, F0, BLOCK_NAMES } from './main/constants'
 import IGameFighter from './bots/contracts/IGameFighter'
-import { XY, xy } from './main/xy'
+import { XY, xy } from './main/XY'
 import LaserShot from './bots/LaserShot'
 import Controls from './player/Controls'
 import ModularRobots from './bots/ModularRobots'
 import GameGeometry from './main/GameGeometry'
 import ModularRobot from './bots/ModularRobot'
-import { BlockDefinition } from './bots/parts/BlockDefinition'
-import ModularBlock from './bots/parts/ModularBlock'
+import { BlockDefinition } from './bots/parts-and-blocks/BlockDefinition'
+import ModularBlock from './bots/parts-and-blocks/ModularBlock'
+import RobotCache from './main/RobotCache'
 
 export default class MainScene extends Phaser.Scene {
     player!: Player
@@ -36,6 +38,8 @@ export default class MainScene extends Phaser.Scene {
     animateScene = false
     prevFrameTime: number = 0
     private prevShotTime: number = 0
+    private robotCache!: RobotCache
+    private lastRobotSave = 0
 
     laserSound!: HTMLAudioElement
     painSound!: HTMLAudioElement
@@ -46,10 +50,13 @@ export default class MainScene extends Phaser.Scene {
     }
 
     preload() {
-        let prefix = 'assets/'
-        let suffix = '.png'
+        const prefix = `${import.meta.env.BASE_URL}assets/`
+        const suffix = '.png'
         BASIC_ASSET_NAMES.forEach(asset => {
             this.load.image(asset, (prefix + asset + suffix))
+        });
+        BLOCK_NAMES.forEach(asset => {
+            this.load.image(asset, (prefix + "block/" + asset + suffix))
         });
         TWO_FRAME_ASSETS.forEach(asset => {
             this.load.image(asset + F0, (prefix + asset + F0 + suffix))
@@ -62,10 +69,10 @@ export default class MainScene extends Phaser.Scene {
         this.load.audio("drilling", audioPre + "drilling.wav", {loop: true, volume: 0.5})
         this.load.audio("weld", audioPre + "weld.mp3")
         this.painSound = new Audio(prefix + "audio/pain.mp3")
-        this.drillSound = this.sound.add("drilling", { loop: true, volume: 0.5 })
     }
-
+    
     create() {
+        this.drillSound = this.sound.add("drilling", { loop: true, volume: 0.5 })
         this.input.setTopOnly(true)
         /// CAMERA ///
         const camera = this.cameras.main
@@ -103,7 +110,6 @@ export default class MainScene extends Phaser.Scene {
         this.createBase(BASE_POS.x, BASE_POS.y)
 
         this.robots = new ModularRobots(this)
-        this.robots.debug_createRobot()
 
         /// Player Firing Laser
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
@@ -111,6 +117,19 @@ export default class MainScene extends Phaser.Scene {
         })
         
         this.createOre(500, 300)
+        this.robotCache = new RobotCache(this, () => this.GUI.showSaveWarning())
+        if (!this.robotCache.load()) this.robots.debug_createRobot()
+        const saveRobots = () => this.robotCache.save()
+        const saveWhenHidden = () => {
+            if (document.visibilityState === "hidden") saveRobots()
+        }
+        window.addEventListener("pagehide", saveRobots)
+        document.addEventListener("visibilitychange", saveWhenHidden)
+        this.events.once("shutdown", () => {
+            saveRobots()
+            window.removeEventListener("pagehide", saveRobots)
+            document.removeEventListener("visibilitychange", saveWhenHidden)
+        })
         
         this.controls = new Controls(this, this.player)
         this.input.addListener("focus", () => {
@@ -208,8 +227,8 @@ export default class MainScene extends Phaser.Scene {
 
         /// BASE GUI ///
         if(this.playerBase.isOverlapped) {
-            this.player.setVisible(false)
             this.GUI.toggleBaseGUI(true)
+            this.player.setVisible(!this.GUI.baseGUI.isVisible)
 
             this.playerBase.isOverlapped = false
         } else {
@@ -227,6 +246,10 @@ export default class MainScene extends Phaser.Scene {
         }
         this.robots.connectWeldingBlocks()
         this.robots.connectFreshBlocks()
+        if (_time - this.lastRobotSave >= 1000) {
+            this.lastRobotSave = _time
+            this.robotCache.save()
+        }
 
         const isAnyRobotDrilling = this.robots.robots.some(robot => robot.isDrilling)
         if (isAnyRobotDrilling && !this.drillSound.isPlaying) {
@@ -327,6 +350,10 @@ export default class MainScene extends Phaser.Scene {
         this.robots.push(newRobot)
         this.uiCamera.ignore(this.baseLayer)
     }
+    debug_getMineSiteXY() {
+        return this.cosmoriteOre.getPosition()
+    }
+
 }
 
 const config: Phaser.Types.Core.GameConfig = {

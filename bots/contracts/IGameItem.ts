@@ -1,5 +1,5 @@
 import MainScene from "../../CodeLuna"
-import { XY } from "../../main/xy"
+import { XY } from "../../main/XY"
 
 export default interface IGameItem {
     image: Phaser.Physics.Arcade.Image

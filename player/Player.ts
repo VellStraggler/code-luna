@@ -1,4 +1,4 @@
-import CpuPart from "../bots/parts/CpuPart";
+import CpuPart from "../bots/parts-and-blocks/CpuPart";
 import MainScene from "../CodeLuna";
 import { BLOCK_DEPTH } from "../main/constants";
 import HPImage from "../main/HPImage";

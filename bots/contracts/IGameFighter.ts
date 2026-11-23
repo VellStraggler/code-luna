@@ -1,5 +1,5 @@
 import HPImage from "../../main/HPImage";
-import { XY } from "../../main/xy";
+import { XY } from "../../main/XY";
 
 export default interface IGameFighter {
     

@@ -1,7 +1,7 @@
 import MainScene from "../../CodeLuna";
 import { generateId, IMPLEMENTATION_ERROR } from "../../main/constants";
 import HPImage from "../../main/HPImage";
-import { xy, XY } from "../../main/xy";
+import { xy, XY } from "../../main/XY";
 import IGameItem from "./IGameItem";
 
 export default class BaseGameItem implements IGameItem {

@@ -1,5 +1,5 @@
 import MyColors from "./MyColors"
-import { xy, XY } from "./xy"
+import { xy, XY } from "./XY"
 
 // Asset keys and animation frames
 /**These names are repeated in ModularRobot, BlockDefinition, and PartDefinition,
@@ -7,8 +7,8 @@ import { xy, XY } from "./xy"
 export const PART_DRILL_NAME = 'part-drill'
 export const PART_GUN_NAME = 'part-gun'
 export const PART_CPU_NAME = 'part-cpu'
-export const BLOCK_WHEEL_NAME = 'block-wheel'
-export const FACTORY_BLOCK = "block-factory"
+export const BLOCK_WHEEL_NAME = 'block/wheel'
+export const FACTORY_BLOCK = "factory"
 export const WHEEL_CHASSIS_NAME = 'wheel-chassis'
 export const WELDER_PART = 'part-welder'
 export const COSMORITE_ORE = "material-cosmorite-ore"
@@ -16,9 +16,12 @@ export const COSMORITE_ORE = "material-cosmorite-ore"
 export const F0 = "-f0"
 export const F1 = "-f1"
 
+export const BLOCK_NAMES = [
+    'aluminum','steel', 'factory', 'sleek', 'tread', 'storage', 'frame','null'
+]
+
 export const BASIC_ASSET_NAMES = [
-    'block-aluminum','block-steel', 'block-factory', 'block-sleek', 'block-tread', 'block-storage', 'block-frame','null',
-    'icon-lunestone','icon-refined-cosmorite', 'icon-cosmorite',
+    'null', 'icon-lunestone','icon-refined-cosmorite', 'icon-cosmorite',
     'material-cosmorite-ore',
     PART_CPU_NAME,'part-radio-transmitter','part-receiving-dish','part-battery','part-solar-panel', PART_GUN_NAME,
     'structure-base', WHEEL_CHASSIS_NAME,

@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser'
 import { F0, F1, HP_BAR_BG_COLOR, HP_BAR_DEPTH, HP_BAR_DISPLAY_TIME_MS, HP_BAR_FG_COLOR, HP_BG_HEIGHT, HP_BG_WIDTH, HP_FG_HEIGHT, HP_FG_WIDTH, HP_HALF_HEIGHT, HP_X_OFFSET, HP_Y_OFFSET, LASER_ENERGY_USE, SHADOW_DEPTH, SHADOW_OFFSET, STARTING_HEALTH, TELEPORT_RANGE, TWO_FRAME_ASSETS } from './constants.ts'
-import { xy, XY } from './xy.ts'
+import { xy, XY } from './XY.ts'
 import MainScene from '../CodeLuna.ts'
 import IGameFighter from '../bots/contracts/IGameFighter.ts'
 import MyColors from './MyColors.ts'

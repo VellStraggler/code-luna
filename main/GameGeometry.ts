@@ -1,6 +1,6 @@
 import { Dirs } from "./constants";
 import HPImage from "./HPImage";
-import { xy, XY } from "./xy";
+import { xy, XY } from "./XY";
 import * as Phaser from 'phaser'
 
 export default class GameGeometry {

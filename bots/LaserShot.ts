@@ -1,6 +1,6 @@
 import { generateId, LASER_DAMAGE, LASER_LIFE, LASER_SPEED } from "../main/constants";
 import MainScene from "../CodeLuna";
-import { XY } from "../main/xy";
+import { XY } from "../main/XY";
 import HPImage from "../main/HPImage";
 import IGameFighter from "./contracts/IGameFighter";
 import ModularRobot from "./ModularRobot";

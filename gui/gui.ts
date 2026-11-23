@@ -3,10 +3,10 @@ import MainScene from "../CodeLuna"
 import { HIDE_POS, GUI_DEPTH, WINDOW, GUI_SIZE, GUI_SECONDARY_SIZE, GUI_MARGIN, TEXT_SPACING, TOOLBOX_WIDTH, TOOLBOX_SPACING, FACTORY_BLOCK, PART_GUN_NAME, WELDER_PART, F0, RESOURCE_TRANSFER_AMOUNT, RESOURCE_TRANSFER_INTERVAL_MS } from "../main/constants"
 import MyColors from "../main/MyColors"
 import ModularRobot from "../bots/ModularRobot"
-import CpuPart, { GuiState } from "../bots/parts/CpuPart"
+import CpuPart, { GuiState } from "../bots/parts-and-blocks/CpuPart"
 import UIColumn from "./UITextColumn"
 import RobotFunctionEditor from "./RobotFunctionEditor"
-import FactoryBlock from "../bots/parts/FactoryBlock"
+import FactoryBlock from "../bots/parts-and-blocks/FactoryBlock"
 import FactoryGUI from "./FactoryGUI"
 import { PlayerState } from "../player/Player"
 
@@ -39,8 +39,10 @@ export default class GUI {
     private robotFunctionEditor: RobotFunctionEditor
     private factoryGUI: FactoryGUI
     private factoryOfGUI: FactoryBlock | null = null
+    private baseMonitorDismissed = false
     private messageOpenFactoryGUI!: Phaser.GameObjects.Text
     private factoryOutline!: Phaser.GameObjects.Rectangle
+    private saveWarning: Phaser.GameObjects.Text | null = null
     private robotResourceButtons: Phaser.GameObjects.Text[] = []
     private resourceTransferHold: {
         pointer: Phaser.Input.Pointer
@@ -75,6 +77,16 @@ export default class GUI {
         this.initMessageOpenFactory()
         this.hideAll()
 
+        const closeOnEscape = (event: KeyboardEvent) => {
+            if (event.key !== "Escape" || event.repeat || event.isComposing ||
+                !this.monitorContainer.visible) return
+            event.preventDefault()
+            event.stopPropagation()
+            this.closeMonitor()
+        }
+        window.addEventListener("keydown", closeOnEscape, true)
+        this.scene.events.once("shutdown", () => window.removeEventListener("keydown", closeOnEscape, true))
+
         this.clickMeOutline = this.scene.add.rectangle(HIDE_POS.x, HIDE_POS.y, 20, 20)
             .setFillStyle(MyColors.white, 0)
             .setDepth(GUI_DEPTH)
@@ -100,6 +112,15 @@ export default class GUI {
     hideGUI() {
         this.hideCpuNotifier()
         this.hideFactoryNotifier()
+    }
+
+    public showSaveWarning() {
+        if (this.saveWarning) return
+        this.saveWarning = this.scene.add.text(TEXT_SPACING, WINDOW.y - TEXT_SPACING,
+            "Robot saving unavailable. Check browser storage.", {
+                fontSize: "14px", color: "#ff8080", backgroundColor: "#000000"
+            }).setOrigin(0, 1).setScrollFactor(0).setDepth(GUI_DEPTH + 2)
+        this.scene.cameras.main.ignore(this.saveWarning)
     }
 
     private initMessageOpenCPU() {
@@ -254,6 +275,9 @@ export default class GUI {
     }
 
     update() {
+        if (this.baseMonitorDismissed && !this.scene.physics.overlap(this.scene.player, this.scene.playerBase)) {
+            this.baseMonitorDismissed = false
+        }
         this.hud.update()
         this.selectNotifierTarget()
         this.updateFactoryGUI()
@@ -336,13 +360,7 @@ export default class GUI {
                 _pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData
             ) => {
                 event.stopPropagation()
-                if (this.factoryGUI.isVisible) {
-                    if (this.factoryOfGUI) this.factoryOfGUI.guiState = GuiState.closed
-                    this.toggleFactoryGUI(false)
-                    this.hideFactoryNotifier()
-                } else {
-                    this.closeRobotGUI()
-                }
+                this.closeMonitor()
             })
         this.monitorContainer.add(this.monitorCloseButton)
     }
@@ -463,10 +481,7 @@ export default class GUI {
             : robot[resource]
         if (available + 1e-9 < RESOURCE_TRANSFER_AMOUNT) return
         if (direction === 1) {
-            const free = robot.blocks.reduce((total, block) => total + Math.max(
-                0, block.blockType.storage - block.storedCosmorite - block.storedLunestone
-            ), 0)
-            if (free + 1e-9 < RESOURCE_TRANSFER_AMOUNT) return
+            if (robot.getFreeStorage() + 1e-9 < RESOURCE_TRANSFER_AMOUNT) return
         }
         const amount = RESOURCE_TRANSFER_AMOUNT * direction
         robot[resource] += amount
@@ -496,6 +511,20 @@ export default class GUI {
         this.hideCpuNotifier()
     }
 
+    private closeMonitor() {
+        if (this.baseGUI.isVisible) {
+            this.baseMonitorDismissed = true
+            this.toggleBaseGUI(false)
+            this.scene.player.setVisible(true)
+        } else if (this.factoryGUI.isVisible) {
+            if (this.factoryOfGUI) this.factoryOfGUI.guiState = GuiState.closed
+            this.toggleFactoryGUI(false)
+            this.hideFactoryNotifier()
+        } else if (this.robotGUI.isVisible) {
+            this.closeRobotGUI()
+        }
+    }
+
     get isFactoryOpen() {
         return this.factoryGUI.isVisible
     }
@@ -516,6 +545,7 @@ export default class GUI {
     }
 
     public toggleBaseGUI(visible:boolean) {
+        if (visible && this.baseMonitorDismissed) return
         if (visible) {
             this.hideCpuNotifier()
             this.hideFactoryNotifier()

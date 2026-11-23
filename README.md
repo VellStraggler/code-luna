@@ -10,10 +10,43 @@ Typescript in Phaser, ported to desktop with Electron, backend server running in
 StarCraft but using programmable, modular robots. Collect Lunestone and Cosmorite gas (Lunestone is revealed by the meteorite crash)
 
 ## Basic Architecture: 
-- Python-like strings parsed into usable Javascript, updating bots 10 times/sec.
-- Loop checks injected to prevent infinite looping where nothing happens.
+- Robot programs use a bounded, Python-like interpreter updated with the game loop.
 - Web-based game with framerate capped at 60 fps. Simple graphics
 - Write so that rendering and update information are entirely separate jobs (decoupled for future backend design with an EC2)
+
+## Robot programs
+
+The robot monitor lets you edit named, no-argument functions and run one with its play button.
+Functions can call each other and return values. For example:
+
+```python
+# Function: travel
+move(0, -100)
+wait(2)
+```
+
+```python
+# Function: patrol
+travel()
+if canMove():
+    goHome()
+```
+
+The language supports numbers, strings, `True`, `False`, `None`, local assignments,
+arithmetic, comparisons, `and`, `or`, `not`, `if`/`else`, `while`, and `return`.
+It is a Python-like subset, not full Python. Indent blocks with spaces.
+
+Commands are `move(x, y)` (relative world units), `aim(x, y)`, `shoot(x, y)`
+(world coordinates), `selectBlock(name)`, `place(x, y, factoryIndex)` (factoryIndex
+defaults to 0), `weld()`, `goToMine()`, `goHome()`, and `wait(seconds)`. Queries
+include `canMove()`, `canMine()`, `hasCpu()`, `hasDrill()`, `getLunestone()`,
+`getCosmorite()`, `getFreeStorage()`, and `getMeterRange()` (estimated metres).
+Movement sets a goal and does not wait for arrival; `wait` pauses the program.
+Running another function replaces the current program; the monitor's Stop button
+cancels it. Programs continue when the monitor closes. Robots and their function
+edits are saved automatically in this browser's local storage and restored on
+reload; running programs do not resume. Instruction and call-depth limits stop
+runaway programs.
 
 ## BUGS:
 - guns without CPUs still fire

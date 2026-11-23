@@ -1,7 +1,7 @@
 import MainScene from "../CodeLuna"
-import { BlockDefinition } from "../bots/parts/BlockDefinition"
-import FactoryBlock from "../bots/parts/FactoryBlock"
-import { PartDefinition } from "../bots/parts/PartDefinition"
+import { BlockDefinition } from "../bots/parts-and-blocks/BlockDefinition"
+import FactoryBlock from "../bots/parts-and-blocks/FactoryBlock"
+import { PartDefinition } from "../bots/parts-and-blocks/PartDefinition"
 import { Dirs, F0, FACTORY_GUI_PADDING, GUI_SIZE, TEXT_SPACING, TOOLBOX_SPACING, TOOLBOX_WIDTH } from "../main/constants"
 import MyColors from "../main/MyColors"
 

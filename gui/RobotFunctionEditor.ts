@@ -1,18 +1,12 @@
 import type MainScene from "../CodeLuna"
 import type ModularRobot from "../bots/ModularRobot"
 import { GUI_DEPTH, GUI_MARGIN } from "../main/constants"
-
-type RobotFunction = {
-    name: string
-    body: string
-    expanded: boolean
-}
+import PythonFunctions, { type RobotFunction } from "../main/PythonFunctions"
 
 export default class RobotFunctionEditor {
     private element: HTMLDivElement
     private viewport: HTMLDivElement
     private robot: ModularRobot | null = null
-    private functionsByRobot = new WeakMap<ModularRobot, RobotFunction[]>()
     private keyboardWasEnabled: boolean | null = null
     private visible = false
 
@@ -36,13 +30,20 @@ export default class RobotFunctionEditor {
                 .robot-function-editor textarea { box-sizing:border-box;width:100%;min-height:60px;margin-top:4px;padding:4px;border:1px solid white;background:#123d12;color:inherit;font:inherit;line-height:20px;resize:none;overflow:hidden; }
                 .robot-function-editor .add-function { min-height:28px;margin-top:4px;text-align:left; }
             </style>
+            <div>Commands: move, canMove, canMine, hasCpu, hasDrill, aim, selectBlock, place, weld, shoot, goToMine, goHome, wait</div>
+            <div>Queries: getLunestone, getCosmorite, getFreeStorage, getMeterRange</div>
+            <div>Python-like: if/else, while, return, assignments; call functions by name.</div>
             <div class="function-list" aria-label="Robot functions"></div>
             <button type="button" class="add-function">+ Add function</button>
+            <button type="button" class="stop-function">Stop program</button>
         `
         this.viewport = this.element.querySelector<HTMLDivElement>(".function-list")!
+        this.element.querySelector<HTMLButtonElement>(".stop-function")!.addEventListener("click", () => {
+            this.robot?.program?.cancel()
+        })
         this.element.querySelector<HTMLButtonElement>(".add-function")!.addEventListener("click", () => {
             if (!this.robot) return
-            const functions = this.functionsByRobot.get(this.robot)!
+            const functions = this.robot.functions!
             const definition = { name: `function${functions.length + 1}`, body: "", expanded: true }
             functions.push(definition)
             const name = this.appendFunction(definition)
@@ -78,14 +79,14 @@ export default class RobotFunctionEditor {
         this.robot = robot
         this.viewport.replaceChildren()
         if (!robot) return
-        let functions = this.functionsByRobot.get(robot)
+        let functions = robot.functions
         if (!functions) {
             functions = [
-                { name: "sendToMine", body: "robot.setGoal(scene.debug_getMineSiteXY())", expanded: false },
-                { name: "sendHome", body: "robot.setGoal(scene.playerBase.getPosition())", expanded: false },
-                { name: "weld", body: "robot.weld()", expanded: false }
+                { name: "sendToMine", body: "goToMine()", expanded: false },
+                { name: "sendHome", body: "goHome()", expanded: false },
+                { name: "weldNearby", body: "weld()", expanded: false }
             ]
-            this.functionsByRobot.set(robot, functions)
+            robot.functions = functions
         }
         for (const definition of functions) this.appendFunction(definition)
         this.viewport.scrollTop = 0
@@ -110,6 +111,10 @@ export default class RobotFunctionEditor {
         const toggle = row.querySelector<HTMLButtonElement>(".expand-function")!
         const body = row.querySelector<HTMLTextAreaElement>("textarea")!
         const error = row.querySelector<HTMLDivElement>(".function-error")!
+        if (definition.error) {
+            error.textContent = definition.error
+            error.hidden = false
+        }
         name.value = definition.name
         const resizeName = () => name.style.width = `${Math.max(1, name.value.length)}ch`
         resizeName()
@@ -117,19 +122,22 @@ export default class RobotFunctionEditor {
             definition.name = name.value
             resizeName()
         })
-        play.addEventListener("click", async () => {
+        play.addEventListener("click", () => {
             const robot = this.robot
             if (!robot) return
+            definition.error = undefined
             error.hidden = true
-            play.disabled = true
             try {
-                const run = new Function("robot", "scene", `"use strict";\n${definition.body}`)
-                await run(robot, this.scene)
+                if (!robot.program) robot.program = new PythonFunctions(this.scene, robot)
+                robot.program.run(robot.functions!, definition.name, message => {
+                    definition.error = message
+                    error.textContent = message
+                    error.hidden = false
+                })
             } catch (cause) {
-                error.textContent = cause instanceof Error ? cause.message : String(cause)
+                definition.error = cause instanceof Error ? cause.message : String(cause)
+                error.textContent = definition.error
                 error.hidden = false
-            } finally {
-                play.disabled = false
             }
         })
         body.value = definition.body

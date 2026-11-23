@@ -1,11 +1,11 @@
 import MainScene from "../CodeLuna"
 import GameGeometry from "../main/GameGeometry"
-import { xy } from "../main/xy"
-import { BlockDefinition } from "./parts/BlockDefinition"
+import { xy } from "../main/XY"
+import { BlockDefinition } from "./parts-and-blocks/BlockDefinition"
 import ModularRobot from "./ModularRobot"
-import { PartDefinition } from "./parts/PartDefinition"
+import { PartDefinition } from "./parts-and-blocks/PartDefinition"
 import { BLOCK_RES, MINING_RATE_MS } from "../main/constants"
-import ModularBlock from "./parts/ModularBlock"
+import ModularBlock from "./parts-and-blocks/ModularBlock"
 import * as Phaser from 'phaser'
 
 export default class ModularRobots {

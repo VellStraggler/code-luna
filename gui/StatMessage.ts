@@ -2,7 +2,7 @@ import MainScene from "../CodeLuna"
 import { GUI_DEPTH, TEXT_SPACING, TOOLBOX_OUTLINE, TOOLBOX_WIDTH } from "../main/constants"
 import GameGeometry from "../main/GameGeometry"
 import MyColors from "../main/MyColors"
-import { XY, xy } from "../main/xy"
+import { XY, xy } from "../main/XY"
 
 export class UITextLine {
     public readonly textObject: Phaser.GameObjects.Text
