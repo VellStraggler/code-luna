@@ -29,9 +29,12 @@ jobs:
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
+          name: game-pages-${{ github.run_id }}-${{ github.run_attempt }}
           path: dist
       - id: deploy
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: game-pages-${{ github.run_id }}-${{ github.run_attempt }}
         continue-on-error: true
       - name: Wait before retrying deployment
         if: steps.deploy.outcome == 'failure'
@@ -39,3 +42,5 @@ jobs:
       - id: retry_deploy
         if: steps.deploy.outcome == 'failure'
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: game-pages-${{ github.run_id }}-${{ github.run_attempt }}
