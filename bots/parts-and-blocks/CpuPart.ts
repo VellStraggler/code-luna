@@ -1,7 +1,7 @@
 import MainScene from "../../CodeLuna";
 import { HIDE_POS, GUI_DEPTH } from "../../main/constants";
 import MyColors from "../../main/MyColors";
-import Player from "../../main/Player";
+import Player from "../../player/Player";
 import ModularBlock from "./ModularBlock";
 import { ModularPart } from "./ModularPart";
 import ModularRobot from "../ModularRobot";
