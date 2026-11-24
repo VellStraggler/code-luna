@@ -2,7 +2,7 @@ import MainScene from "../CodeLuna";
 import { TEXT_SPACING, TOOLBOX_SPACING, TOOLBOX_WIDTH } from "../main/constants";
 import GameGeometry from "../main/GameGeometry";
 import { PlayerState } from "../player/Player";
-import UIStatLine, { UIIconButton, UIIconStatLine, UIStatButtonLine, UITextButtonLine, UITextLine } from "./StatMessage";
+import UIStatLine, { UIFormattedStatLine, UIIconButton, UIIconStatLine, UIStatButtonLine, UITextButtonLine, UITextLine } from "./StatMessage";
 
 export default class UIColumn {
     private scene: MainScene
@@ -46,7 +46,7 @@ export default class UIColumn {
         }
     }
 
-    public addIconStatLine(phaserName: string, msg: string, getVariable: () => any, reservedWidth: number = 0) {
+    public addIconStatLine(phaserName: string, msg: string, getVariable: () => any, reservedWidth: number = 0, fontHeight: number = 16) {
         const line = new UIIconStatLine(
             this.scene,
             this.x,
@@ -54,15 +54,16 @@ export default class UIColumn {
             phaserName,
             msg,
             getVariable,
-            this.align
+            this.align,
+            fontHeight
         )
         line.reservedWidth = reservedWidth
         this.list.push(line)
-        this.latestY += TEXT_SPACING
+        this.latestY += Math.max(TEXT_SPACING, fontHeight)
         return this
     }
 
-    public addStatLine(msg: string, getVariable: () => any) {
+    public addStatLine(msg: string, getVariable: () => any, fontHeight: number = 16) {
         this.list.push(
             new UIStatLine(
                 this.scene,
@@ -70,14 +71,21 @@ export default class UIColumn {
                 this.latestY,
                 msg,
                 getVariable,
-                this.align
+                this.align,
+                fontHeight
             )
         )
-        this.latestY += TEXT_SPACING
+        this.latestY += Math.max(TEXT_SPACING, fontHeight)
         return this
     }
 
-    public addButtonLine(msg: string, onClick: () => any) {
+    public addFormattedStatLine(format: () => string, fontHeight = 16) {
+        this.list.push(new UIFormattedStatLine(this.scene, this.x, this.latestY, format, this.align, fontHeight))
+        this.latestY += Math.max(TEXT_SPACING, fontHeight)
+        return this
+    }
+
+    public addButtonLine(msg: string, onClick: () => any, fontHeight: number = 16) {
         this.list.push(
             new UITextButtonLine(
                 this.scene,
@@ -85,14 +93,15 @@ export default class UIColumn {
                 this.latestY,
                 msg,
                 onClick,
-                this.align
+                this.align,
+                fontHeight
             )
         )
-        this.latestY += TEXT_SPACING
+        this.latestY += Math.max(TEXT_SPACING, fontHeight)
         return this
     }
 
-    public addStatButtonLine(msg: string, onClick: () => any) {
+    public addStatButtonLine(msg: string, onClick: () => any, fontHeight: number = 16) {
         this.list.push(
             new UIStatButtonLine(
                 this.scene,
@@ -100,20 +109,21 @@ export default class UIColumn {
                 this.latestY,
                 msg,
                 onClick,
-                this.align
+                this.align,
+                fontHeight
             )
         )
-        this.latestY += TEXT_SPACING
+        this.latestY += Math.max(TEXT_SPACING, fontHeight)
         return this
     }
 
-    public addTextLine(msg: string) {
+    public addTextLine(msg: string, fontHeight: number = 16) {
         this.list.push(
             new UITextLine(
-                this.scene, this.x, this.latestY, msg, this.align
+                this.scene, this.x, this.latestY, msg, this.align, fontHeight
             )
         )
-        this.latestY += TEXT_SPACING
+        this.latestY += Math.max(TEXT_SPACING, fontHeight)
         return this
     }
 
@@ -154,16 +164,19 @@ export default class UIColumn {
                 this.x, 
                 this.latestY, 
                 iconName, 
-                fun,
-                () => { 
-                    this.scene.player.playerState = PlayerState.holdingNothing
-                    for(const button of this.iconButtons) {
-                        button.deselect()
-                    }
-                })
+                () => {
+                    this.scene.GUI.selectTool()
+                    fun()
+                },
+                () => this.deselectButtons(), this.iconButtons.length + 1)
         )
         this.latestY += TOOLBOX_WIDTH + TOOLBOX_SPACING
         return this
+    }
+
+    public deselectButtons() {
+        this.scene.player.playerState = PlayerState.holdingNothing
+        for (const button of this.iconButtons) button.deselect()
     }
 
     public getAsGameObjects(): (Phaser.GameObjects.Text | Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle)[] {

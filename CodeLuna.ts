@@ -18,6 +18,7 @@ import ModularRobot from './bots/ModularRobot'
 import { BlockDefinition } from './bots/parts-and-blocks/BlockDefinition'
 import ModularBlock from './bots/parts-and-blocks/ModularBlock'
 import RobotCache from './main/RobotCache'
+import PublicChat from './main/PublicChat'
 
 export default class MainScene extends Phaser.Scene {
     player!: Player
@@ -28,9 +29,11 @@ export default class MainScene extends Phaser.Scene {
     cosmoriteOre!: HPImage
     mineSites: HPImage[] = []
     mainStats!: MainStats
+    readonly chat = new PublicChat()
     GUI!: GUI
     uiCamera!: Phaser.Cameras.Scene2D.Camera
-    baseLayer: Phaser.GameObjects.GameObject[] = []
+    worldLayer!: Phaser.GameObjects.Layer
+    private playerCollisionBodies = new Map<Phaser.Physics.Arcade.Body, boolean>()
 
     private controls!: Controls
     typing = false
@@ -68,6 +71,7 @@ export default class MainScene extends Phaser.Scene {
         this.load.audio("pain", audioPre + "pain.mp3")
         this.load.audio("drilling", audioPre + "drilling.wav", {loop: true, volume: 0.5})
         this.load.audio("weld", audioPre + "weld.mp3")
+        this.load.audio("cancelled", audioPre + "cancelled.mp3")
         this.painSound = new Audio(prefix + "audio/pain.mp3")
     }
     
@@ -97,9 +101,15 @@ export default class MainScene extends Phaser.Scene {
         this.uiCamera.setZoom(1)
         if (this.physics.world.debugGraphic != undefined)
         this.uiCamera.ignore(this.physics.world.debugGraphic) // no hitboxes double-rendered
+        this.worldLayer = this.add.layer()
+        this.uiCamera.ignore(this.worldLayer)
+        this.physics.world.on(Phaser.Physics.Arcade.Events.WORLD_STEP, () => {
+            for (const [body, immovable] of this.playerCollisionBodies) body.setImmovable(immovable)
+            this.playerCollisionBodies.clear()
+        })
 
         /// GUI and Stats ///
-        this.mainStats = new MainStats(10,10)
+        this.mainStats = new MainStats(10,10, () => this.cancelAction())
         this.GUI = new GUI(this, this.mainStats)
         camera.ignore(this.GUI.getUILayer())
 
@@ -132,27 +142,38 @@ export default class MainScene extends Phaser.Scene {
         })
         
         this.controls = new Controls(this, this.player)
-        this.input.addListener("focus", () => {
-            console.log("FOCUS")
-            this.typing = true
-            this.input.keyboard!.enabled = false
-        })
-        this.input.addListener("blur", () => {
-            console.log("BLUR")
-            this.typing = false
-            this.input.keyboard!.enabled = true
-        })
+    }
 
-        //UI Camera shouldn't double-render non-UI items
-        const baseLayer = this.add.layer(this.baseLayer)
-        this.uiCamera.ignore(baseLayer)
+    addWorldObject(object: Phaser.GameObjects.GameObject) {
+        if (!this.worldLayer.list.includes(object)) this.worldLayer.add(object)
+    }
+
+    cancelAction() {
+        if (!this.sound.get("cancelled")?.isPlaying) this.sound.play("cancelled")
+    }
+
+    isPlayerMoving() {
+        return this.controls?.isMoving() ?? false
+    }
+
+    preventPlayerPush(body: Phaser.Physics.Arcade.Body) {
+        if (!this.playerCollisionBodies.has(body)) this.playerCollisionBodies.set(body, body.immovable)
+        body.setImmovable(true)
+    }
+
+    restorePlayerCollision(body: Phaser.Physics.Arcade.Body) {
+        const immovable = this.playerCollisionBodies.get(body)
+        if (immovable === undefined) return
+        body.setImmovable(immovable)
+        this.playerCollisionBodies.delete(body)
     }
 
     createGround() {
         this.ground = this.add.tileSprite(
             0, 600, 5000, 5000, 'tile-ground'
         )
-        this.uiCamera.ignore(this.ground)
+        this.ground.setDepth(-100)
+        this.addWorldObject(this.ground)
     }
 
     createOre(x = 0, y = 0) {
@@ -291,14 +312,17 @@ export default class MainScene extends Phaser.Scene {
         const energyCost = shooter.shootLaser()
         if (energyCost > 0) {
             new LaserShot(this, shooter, this.robots.robots, targetPosition)
-        }
+        } else this.cancelAction()
     }
 
     public async weldAtMousePosition(sourceImage: HPImage, pointer: Phaser.Input.Pointer) {
         // ensure they are both close enough to position
         console.log(sourceImage.getPosition() + " as player, clicked at: " + pointer.worldX + ", " + pointer.worldY)
         const distanceFromPlayer = GameGeometry.distanceFromPointer(sourceImage, pointer)
-        if (distanceFromPlayer > BLOCK_RES * 6) return
+        if (distanceFromPlayer > BLOCK_RES * 6) {
+            this.cancelAction()
+            return
+        }
         // find 2 nearest robots and the nearest blocks within them
         let nearestBlocks: ModularBlock[] = []
         for (const robot of this.robots) {
@@ -323,32 +347,34 @@ export default class MainScene extends Phaser.Scene {
         if (nearestBlocks.length >= 2) {
             let blockA = nearestBlocks[0]
             let blockB = nearestBlocks[1]
-            blockA.connectRobotAt(blockB)
+            if (!blockA.connectRobotAt(blockB)) this.cancelAction()
         } else if (nearestBlocks.length == 1) {
             const block = nearestBlocks[0]
             if (block.hp < block.maxHP && block.image.getBounds().contains(clickPosition.x, clickPosition.y)) {
                 block.resetHP()
                 this.sound.play("weld")
-            }
-        }
+            } else this.cancelAction()
+        } else this.cancelAction()
     }
 
     public debug_summonBlock(sourceImage: HPImage, pointer: Phaser.Input.Pointer) {
         const distanceFromPlayer = GameGeometry.distanceFromPointer(sourceImage, pointer)
-        if (distanceFromPlayer > BLOCK_RES * 6) return
+        if (distanceFromPlayer > BLOCK_RES * 6) {
+            this.cancelAction()
+            return
+        }
         if (this.mainStats.getLunestone() >= 1) {
             this.mainStats.incLunestone(-1)
             const x = Math.round(pointer.worldX/BLOCK_RES) * BLOCK_RES
             const y = Math.round(pointer.worldY/BLOCK_RES) * BLOCK_RES
             this.robots.push(ModularRobot.create(this, x, y, BlockDefinition.factory)
                 .addEnemyCollider(this.player))
-        }
+        } else this.cancelAction()
     }
     public debug_summonRobot() {
         let newRobot = this.robots.get(0).deepCopy(200,200)
         newRobot.addEnemyCollider(this.player)
         this.robots.push(newRobot)
-        this.uiCamera.ignore(this.baseLayer)
     }
     debug_getMineSiteXY() {
         return this.cosmoriteOre.getPosition()

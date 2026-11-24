@@ -45,6 +45,7 @@ export default class ModularRobots {
     }
 
     connectWeldingBlocks(target?: ModularRobot) {
+        let welded = false
         for (const robot of target ? [target] : [...this.robots]) {
             for (const welder of [...robot.parts]) {
                 if (welder.partType !== PartDefinition.partWelder) continue
@@ -66,9 +67,11 @@ export default class ModularRobots {
                                 welder.parentBlock.updateFreshness()
                             }
                             connected = true
+                            welded = true
                             break
                         }
                     }
+                    return welded
                     if (connected) break
                 }
             }

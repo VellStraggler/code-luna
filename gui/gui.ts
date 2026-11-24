@@ -1,6 +1,7 @@
+import * as Phaser from "phaser"
 import MainStats from "../player/MainStats"
 import MainScene from "../CodeLuna"
-import { HIDE_POS, GUI_DEPTH, WINDOW, GUI_SIZE, GUI_SECONDARY_SIZE, GUI_MARGIN, TEXT_SPACING, TOOLBOX_WIDTH, TOOLBOX_SPACING, FACTORY_BLOCK, PART_GUN_NAME, WELDER_PART, F0, RESOURCE_TRANSFER_AMOUNT, RESOURCE_TRANSFER_INTERVAL_MS } from "../main/constants"
+import { BLOCK_RES, HIDE_POS, GUI_DEPTH, WINDOW, GUI_SIZE, GUI_SECONDARY_SIZE, GUI_MARGIN, TEXT_SPACING, TOOLBOX_WIDTH, TOOLBOX_SPACING, FACTORY_BLOCK, PART_GUN_NAME, WELDER_PART, F0, RESOURCE_TRANSFER_AMOUNT, RESOURCE_TRANSFER_INTERVAL_MS } from "../main/constants"
 import MyColors from "../main/MyColors"
 import ModularRobot from "../bots/ModularRobot"
 import CpuPart, { GuiState } from "../bots/parts-and-blocks/CpuPart"
@@ -9,6 +10,7 @@ import RobotFunctionEditor from "./RobotFunctionEditor"
 import FactoryBlock from "../bots/parts-and-blocks/FactoryBlock"
 import FactoryGUI from "./FactoryGUI"
 import { PlayerState } from "../player/Player"
+import Handbook from "./Handbook"
 
 type RobotResource = "storedLunestone" | "storedCosmorite"
 type NotifierTarget = CpuPart | FactoryBlock
@@ -18,6 +20,15 @@ export default class GUI {
 
     mainStats: MainStats
     public hud!: UIColumn
+    private quota!: UIColumn
+    private chatText!: Phaser.GameObjects.Text
+    private baseArrow!: Phaser.GameObjects.Graphics
+    private handbook!: Handbook
+    private bookInFront = false
+    private launchAmount = 0
+    private launchText!: Phaser.GameObjects.Text
+    private launchControls: Phaser.GameObjects.GameObject[] = []
+    private launchHold: { pointer: Phaser.Input.Pointer, direction: 1 | -1, started: number, next: number } | null = null
 
     public guiRects: Phaser.GameObjects.Rectangle[] = []
 
@@ -62,9 +73,11 @@ export default class GUI {
         this.initCommandGUI()
         this.initCpuGUI()
         this.factoryGUI = new FactoryGUI(this.scene)
-        this.robotFunctionEditor = new RobotFunctionEditor(this.scene)
+        this.robotFunctionEditor = new RobotFunctionEditor(this.scene, () => this.bringMonitorForward())
+        this.handbook = new Handbook(this.scene, () => this.bringBookForward(), () => this.closeBook())
         this.monitorScreens[0].add([
             ...this.baseGUI.getAsGameObjects(),
+            ...this.launchControls,
             ...this.robotGUI.getAsGameObjects()
         ])
         this.monitorScreens[0].add(this.factoryGUI.container)
@@ -93,13 +106,20 @@ export default class GUI {
             .setVisible(false)
             .setStrokeStyle(1, 0xffffff)
         this.scene.uiCamera.ignore(this.clickMeOutline)
+        this.scene.addWorldObject(this.clickMeOutline)
     }
 
     private initHud() {
         this.hud = new UIColumn(this.scene, TEXT_SPACING, TEXT_SPACING, true)
-            .addIconStatLine('icon-lunestone', 'x ', () => this.mainStats.getLunestone())
-            .addIconStatLine('icon-refined-cosmorite', 'x ', () => this.mainStats.getGas())
-            .addIconStatLine('part-battery', 'x ', () => this.mainStats.getEnergyUseMs() * 1000)
+            .addIconStatLine('icon-lunestone', 'x', () => this.mainStats.getLunestone())
+            .addIconStatLine('icon-refined-cosmorite', 'x', () => this.mainStats.getGas())
+            .addIconStatLine('part-battery', 'x', () => this.mainStats.getEnergyUseMs() * 1000)
+        this.quota = new UIColumn(this.scene, WINDOW.x - TEXT_SPACING, TEXT_SPACING, true, "right")
+            .addFormattedStatLine(() => `GAS QUOTA: ${this.mainStats.gasToShip.toFixed(1)}/1000`, 22)
+        this.chatText = this.scene.add.text(TEXT_SPACING, WINDOW.y - TEXT_SPACING, "", {
+            fontSize: "13px", color: "#ffffff", backgroundColor: "#00000099", wordWrap: { width: 250 }
+        }).setOrigin(0, 1).setScrollFactor(0).setDepth(GUI_DEPTH)
+        this.baseArrow = this.scene.add.graphics().setScrollFactor(0).setDepth(GUI_DEPTH - 1)
     }
 
     private hideAll() {
@@ -136,7 +156,7 @@ export default class GUI {
         this.messageOpenRobotGUI.setInteractive({ useHandCursor: true }).setDepth(GUI_DEPTH).on('pointerdown', (
             _pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData
         ) => {
-            if (this.scene.player.playerState !== PlayerState.holdingNothing) return
+            if (!this.canOpenMonitor()) return
             event.stopPropagation()
             if (this.baseGUI.isVisible || this.factoryGUI.isVisible) return
             const cpu = this.cpuOfGUI
@@ -150,6 +170,7 @@ export default class GUI {
             .setVisible(false)
         this.messageOpenRobotGUI.setDepth(GUI_DEPTH + 1)
         this.scene.uiCamera.ignore(this.messageOpenRobotGUI)
+        this.scene.addWorldObject(this.messageOpenRobotGUI)
     }
 
     private initMessageOpenFactory() {
@@ -165,7 +186,7 @@ export default class GUI {
             .on("pointerdown", (
                 _pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData
             ) => {
-                if (this.scene.player.playerState !== PlayerState.holdingNothing) return
+                if (!this.canOpenMonitor()) return
                 event.stopPropagation()
                 if (this.baseGUI.isVisible || !this.factoryOfGUI?.isNearPlayer()) return
                 this.factoryOfGUI.guiState = GuiState.open
@@ -178,6 +199,8 @@ export default class GUI {
             .setDepth(GUI_DEPTH)
             .setVisible(false)
         this.scene.uiCamera.ignore([this.messageOpenFactoryGUI, this.factoryOutline])
+        this.scene.addWorldObject(this.messageOpenFactoryGUI)
+        this.scene.addWorldObject(this.factoryOutline)
     }
 
     private hideFactoryNotifier() {
@@ -185,8 +208,13 @@ export default class GUI {
         this.factoryOutline.setPosition(HIDE_POS.x, HIDE_POS.y).setVisible(false)
     }
 
+    private canOpenMonitor() {
+        const state = this.scene.player.playerState
+        return state === PlayerState.holdingNothing || state === PlayerState.holdingHandbook
+    }
+
     private selectNotifierTarget() {
-        if (this.baseGUI.isVisible || this.scene.player.playerState !== PlayerState.holdingNothing) {
+        if (this.baseGUI.isVisible || !this.canOpenMonitor()) {
             this.notifierTarget = null
             return
         }
@@ -206,7 +234,9 @@ export default class GUI {
         if (current && targets.includes(current) && current.guiState === GuiState.open &&
             current.getDistanceToPlayer() < 50) return
 
-        const nearby = targets.filter(target => target.isNearPlayer())
+        const nearby = targets.filter(target => target.isNearPlayer() &&
+            Phaser.Math.Distance.Between(target.image.x, target.image.y,
+                this.scene.playerBase.x, this.scene.playerBase.y) > BLOCK_RES * 2)
         if (nearby.length <= 1) {
             this.notifierTarget = nearby[0] ?? null
             return
@@ -238,7 +268,7 @@ export default class GUI {
         this.factoryOfGUI = closest
         this.factoryGUI.setFactory(closest)
         if (!closest || this.baseGUI.isVisible || this.robotGUI.isVisible ||
-            this.scene.player.playerState !== PlayerState.holdingNothing) {
+            !this.canOpenMonitor()) {
             if (closest) closest.guiState = GuiState.closed
             this.hideFactoryNotifier()
             this.toggleFactoryGUI(false)
@@ -279,12 +309,25 @@ export default class GUI {
             this.baseMonitorDismissed = false
         }
         this.hud.update()
+        this.quota.update()
+        this.chatText.setText(this.scene.chat.getText().split("\n").slice(-5).join("\n"))
         this.selectNotifierTarget()
         this.updateFactoryGUI()
         this.updateRobotGUI()
         this.updateResourceTransfer()
+        this.updateLaunchHold()
+        this.launchAmount = Math.min(this.launchAmount, Math.max(0, Math.floor(this.mainStats.getGas() - 100)))
+        this.launchText.setText(`Stored gas: ${this.mainStats.getGas().toFixed(1)}\nPayload: [${this.launchAmount.toFixed(1)}]`)
         this.robotStatsGUI.update()
-        if (this.robotGUI.isVisible) this.robotFunctionEditor.position(this.monitorScreens[0])
+        const capacity = this.robotStatsGUI.list[this.robotStatsGUI.list.length - 1]
+        const robot = this.robotOfCPU
+        const full = !!robot && robot.storageSpace > 0 &&
+            robot.storedLunestone + robot.storedCosmorite >= robot.storageSpace - 1e-6
+        capacity.getObjects().forEach(object => {
+            if (object instanceof Phaser.GameObjects.Text) object.setColor(full ? "#ff3333" : "#ffffff")
+        })
+        if (this.robotGUI.isVisible && !this.bookInFront) this.robotFunctionEditor.position(this.monitorScreens[0])
+        this.updateBaseArrow()
     }
 
     public updateRobotGUI() {
@@ -297,7 +340,7 @@ export default class GUI {
         if (previousCpu && previousCpu !== cpu) previousCpu.guiState = GuiState.closed
 
         if (!cpu || this.baseGUI.isVisible || this.factoryGUI.isVisible ||
-            this.scene.player.playerState !== PlayerState.holdingNothing) {
+            !this.canOpenMonitor()) {
             if (cpu) cpu.guiState = GuiState.closed
             this.hideCpuNotifier()
             this.toggleRobotGUI(false)
@@ -341,6 +384,11 @@ export default class GUI {
                 .setOrigin(0, 0)
                 .setAlpha(0.6)
                 .setStrokeStyle(2, MyColors.white)
+                .setInteractive()
+                .on("pointerdown", (_p: unknown, _x: unknown, _y: unknown, event: Phaser.Types.Input.EventData) => {
+                    event.stopPropagation()
+                    this.bringMonitorForward()
+                })
             screen.add(box)
             this.guiRects.push(box)
             this.monitorScreens.push(screen)
@@ -404,6 +452,12 @@ export default class GUI {
             .addIconButton(PART_GUN_NAME, () => this.scene.player.toggleHoldingGun())
             .addIconButton(WELDER_PART + F0, () => this.scene.player.toggleHoldingWelder())
             .addIconButton(FACTORY_BLOCK, () => this.scene.player.toggleHoldingFactoryBlock())
+            .addIconButton("null", () => {
+                this.scene.player.playerState = PlayerState.holdingHandbook
+                this.handbook.container.setVisible(true)
+                this.bringBookForward()
+                return true
+            })
     }
 
     private initCpuGUI() {
@@ -479,9 +533,9 @@ export default class GUI {
         const available = direction === 1
             ? gas ? this.mainStats.getGas() : this.mainStats.getLunestone()
             : robot[resource]
-        if (available + 1e-9 < RESOURCE_TRANSFER_AMOUNT) return
+        if (available + 1e-9 < RESOURCE_TRANSFER_AMOUNT) { this.scene.cancelAction(); return }
         if (direction === 1) {
-            if (robot.getFreeStorage() + 1e-9 < RESOURCE_TRANSFER_AMOUNT) return
+            if (robot.getFreeStorage() + 1e-9 < RESOURCE_TRANSFER_AMOUNT) { this.scene.cancelAction(); return }
         }
         const amount = RESOURCE_TRANSFER_AMOUNT * direction
         robot[resource] += amount
@@ -496,11 +550,36 @@ export default class GUI {
             .addButtonLine("Move all 100 DOWN  v: ", () => {this.scene.robots.debug_moveAllRobots(0,100)})
             .addButtonLine("Move all 100 LEFT  <: ", () => {this.scene.robots.debug_moveAllRobots(-100,0)})
             .addButtonLine("Move all 100 RIGHT >: ", () => {this.scene.robots.debug_moveAllRobots(100,0)})
+        const y = this.baseGUI.latestY + 10
+        this.launchText = this.scene.add.text(GUI_MARGIN, y, "", { fontSize: "16px", color: "#ffffff" })
+        this.launchControls.push(this.launchText)
+        for (const [direction, offset, label] of [[1, 0, "\u25b2"], [-1, 20, "\u25bc"]] as const) {
+            const button = this.scene.add.text(260, y + 18 + offset, label, { fontSize: "16px", color: "#ffffff" })
+                .setInteractive({ useHandCursor: true })
+                .on("pointerdown", (pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+                    event.stopPropagation()
+                    this.adjustLaunchAmount(direction, 1)
+                    this.launchHold = { pointer, direction, started: this.scene.time.now, next: this.scene.time.now + 100 }
+                })
+            const stop = () => { this.launchHold = null }
+            button.on("pointerup", stop).on("pointerout", stop)
+            this.launchControls.push(button)
+        }
+        const deploy = this.scene.add.text(300, y + 28, "[Deploy (costs 100)]", {
+            fontSize: "14px", color: "#ffffff"
+        }).setInteractive({ useHandCursor: true }).on("pointerdown",
+            (_p: unknown, _x: unknown, _y: unknown, event: Phaser.Types.Input.EventData) => {
+                event.stopPropagation()
+                this.deployRocket()
+            })
+        this.launchControls.push(deploy)
     }
 
     public getUILayer(): Phaser.GameObjects.Layer  {
         const uiLayer = this.scene.add.layer(this.hud.getAsGameObjects())
+        uiLayer.add([...this.quota.getAsGameObjects(), this.chatText, this.baseArrow, ...this.playerTools.getAsGameObjects()])
         uiLayer.add(this.monitorContainer)
+        uiLayer.add(this.handbook.container)
         return uiLayer
     }
 
@@ -525,6 +604,130 @@ export default class GUI {
         }
     }
 
+    public selectTool() {
+        this.closeMonitor()
+    }
+
+    private bringBookForward() {
+        this.bookInFront = true
+        this.handbook.container.setDepth(GUI_DEPTH + 2)
+        this.monitorContainer.setDepth(GUI_DEPTH)
+        this.robotFunctionEditor.setVisible(false)
+    }
+
+    private bringMonitorForward() {
+        this.bookInFront = false
+        this.monitorContainer.setDepth(GUI_DEPTH + 3)
+        if (this.robotGUI.isVisible) {
+            this.robotFunctionEditor.setVisible(true)
+            this.robotFunctionEditor.position(this.monitorScreens[0])
+        }
+    }
+
+    private closeBook() {
+        this.handbook.container.setVisible(false)
+        if (this.scene.player.playerState === PlayerState.holdingHandbook) this.playerTools.deselectButtons()
+        this.bringMonitorForward()
+    }
+
+    private adjustLaunchAmount(direction: 1 | -1, amount: number) {
+        const max = Math.max(0, Math.floor(this.mainStats.getGas() - 100))
+        const next = Phaser.Math.Clamp(this.launchAmount + direction * amount, 0, max)
+        if (next === this.launchAmount) this.scene.cancelAction()
+        this.launchAmount = next
+    }
+
+    private updateLaunchHold() {
+        const hold = this.launchHold
+        if (!hold) return
+        if (!hold.pointer.leftButtonDown() || !this.baseGUI.isVisible) {
+            this.launchHold = null
+            return
+        }
+        while (this.scene.time.now >= hold.next) {
+            const seconds = Math.floor((hold.next - hold.started) / 1000)
+            const interval = seconds < 2 ? 100 : 1
+            const step = seconds < 2 ? Math.pow(10, seconds) : 100 * Math.pow(10, Math.min(seconds - 2, 9))
+            const end = Math.min(this.scene.time.now, hold.started + (seconds + 1) * 1000 - 0.0001)
+            const count = Math.max(1, Math.floor((end - hold.next) / interval) + 1)
+            this.adjustLaunchAmount(hold.direction, step * count)
+            hold.next += interval * count
+        }
+    }
+
+    private deployRocket() {
+        const amount = this.launchAmount
+        if (amount <= 0 || this.mainStats.getGas() < amount + 100) {
+            this.scene.cancelAction()
+            return
+        }
+        this.mainStats.incGas(-(amount + 100))
+        this.launchAmount = 0
+        const bounds = this.scene.playerBase.getBounds()
+        const rocket = this.scene.add.image(bounds.left, bounds.top, "null")
+        this.scene.addWorldObject(rocket)
+        this.scene.tweens.add({
+            targets: rocket,
+            y: rocket.y - 100 * BLOCK_RES,
+            alpha: 0,
+            duration: 4000,
+            onComplete: () => {
+                this.mainStats.gasToShip += amount
+                rocket.destroy()
+            }
+        })
+    }
+
+    private updateBaseArrow() {
+        this.baseArrow.clear()
+        const camera = this.scene.cameras.main
+        const topLeft = camera.getWorldPoint(0, 0)
+        const base = this.scene.playerBase
+        const x = (base.x - topLeft.x) * camera.zoom
+        const y = (base.y - topLeft.y) * camera.zoom
+        if (Phaser.Geom.Intersects.RectangleToRectangle(camera.worldView, base.getBounds())) return
+        const dx = x - WINDOW.x / 2
+        const dy = y - WINDOW.y / 2
+        const t = Math.min((WINDOW.x / 2 - 24) / Math.max(Math.abs(dx), 1e-9),
+            (WINDOW.y / 2 - 24) / Math.max(Math.abs(dy), 1e-9))
+        const tipX = WINDOW.x / 2 + dx * t
+        const tipY = WINDOW.y / 2 + dy * t
+        const verticalEdge = Math.abs(tipX - 24) < 0.01 || Math.abs(tipX - (WINDOW.x - 24)) < 0.01
+        const obstacles: Phaser.Geom.Rectangle[] = []
+        if (this.monitorContainer.visible) obstacles.push(new Phaser.Geom.Rectangle(
+            this.monitorContainer.x, this.monitorContainer.y, this.monitorContainer.width, this.monitorContainer.height))
+        if (this.handbook.container.visible) obstacles.push(new Phaser.Geom.Rectangle(
+            this.handbook.container.x, this.handbook.container.y, 300, 500))
+        for (const object of [...this.hud.getAsGameObjects(), ...this.quota.getAsGameObjects(),
+            ...this.playerTools.getAsGameObjects(), this.chatText]) {
+            if (object.visible && (!(object instanceof Phaser.GameObjects.Text) || object.text)) obstacles.push(object.getBounds())
+        }
+        for (let offset = 0; offset <= 800; offset += 8) {
+            for (const sign of offset === 0 ? [1] : [1, -1]) {
+                const tx = verticalEdge ? tipX : Phaser.Math.Clamp(tipX + offset * sign, 24, WINDOW.x - 24)
+                const ty = verticalEdge ? Phaser.Math.Clamp(tipY + offset * sign, 24, WINDOW.y - 24) : tipY
+                const angle = Math.atan2(y - ty, x - tx)
+                const ux = Math.cos(angle), uy = Math.sin(angle)
+                const px = -uy, py = ux
+                const points = [
+                    new Phaser.Math.Vector2(tx, ty),
+                    new Phaser.Math.Vector2(tx - ux * 32 + px * 13, ty - uy * 32 + py * 13),
+                    new Phaser.Math.Vector2(tx - ux * 25, ty - uy * 25),
+                    new Phaser.Math.Vector2(tx - ux * 32 - px * 13, ty - uy * 32 - py * 13)
+                ]
+                const left = Math.min(...points.map(point => point.x))
+                const top = Math.min(...points.map(point => point.y))
+                const bounds = new Phaser.Geom.Rectangle(left, top,
+                    Math.max(...points.map(point => point.x)) - left,
+                    Math.max(...points.map(point => point.y)) - top)
+                if (left < 0 || top < 0 || bounds.right > WINDOW.x || bounds.bottom > WINDOW.y ||
+                    obstacles.some(obstacle => Phaser.Geom.Intersects.RectangleToRectangle(bounds, obstacle))) continue
+                this.baseArrow.fillStyle(0xffffff, 0.9).fillPoints(points, true)
+                return
+            }
+        }
+    }
+
     get isFactoryOpen() {
         return this.factoryGUI.isVisible
     }
@@ -533,6 +736,8 @@ export default class GUI {
         if (visible && this.baseGUI.isVisible) return
         if (this.factoryGUI.isVisible === visible) return
         if (visible) {
+            this.playerTools.deselectButtons()
+            this.bringMonitorForward()
             const cpu = this.cpuOfGUI
             if (cpu) cpu.guiState = GuiState.closed
             this.robotGUI.setVisibility(false)
@@ -540,7 +745,6 @@ export default class GUI {
             this.hideCpuNotifier()
         }
         this.factoryGUI.setVisible(visible)
-        this.playerTools.setVisibility(!visible && !this.baseGUI.isVisible && !this.robotGUI.isVisible)
         this.toggleScreen()
     }
 
@@ -558,9 +762,8 @@ export default class GUI {
         if (visible) {
             this.robotGUI.setVisibility(false)
             this.robotStatsGUI.setVisibility(false)
-            this.playerTools.setVisibility(false)
-        } else {
-            this.playerTools.setVisibility(true)
+            this.playerTools.deselectButtons()
+            this.bringMonitorForward()
         }
         this.baseGUI.setVisibility(visible)
         this.toggleScreen()
@@ -571,9 +774,8 @@ export default class GUI {
         if(this.robotGUI.isVisible == visible) return
         if (visible) {
             this.baseGUI.setVisibility(false)
-            this.playerTools.setVisibility(false)
-        } else {
-            this.playerTools.setVisibility(true)
+            this.playerTools.deselectButtons()
+            this.bringMonitorForward()
         }
         this.robotGUI.setVisibility(visible)
         this.robotStatsGUI.setVisibility(visible)
@@ -581,6 +783,7 @@ export default class GUI {
     }
 
     public toggleScreen() {
+        this.launchControls.forEach(control => (control as Phaser.GameObjects.Text).setVisible(this.baseGUI.isVisible))
         this.robotResourceButtons.forEach(button => button.setVisible(this.robotGUI.isVisible))
         if (!this.robotGUI.isVisible) this.resourceTransferHold = null
         let setVisible = false
@@ -588,10 +791,10 @@ export default class GUI {
             setVisible = true
         }
         this.monitorContainer.setVisible(setVisible)
-        this.monitorCloseButton.setVisible(this.robotGUI.isVisible || this.factoryGUI.isVisible)
+        this.monitorCloseButton.setVisible(setVisible)
         if (setVisible) this.layoutMonitor()
         this.robotFunctionEditor.setRobot(this.robotOfCPU)
         if (this.robotGUI.isVisible) this.robotFunctionEditor.position(this.monitorScreens[0])
-        this.robotFunctionEditor.setVisible(this.robotGUI.isVisible)
+        this.robotFunctionEditor.setVisible(this.robotGUI.isVisible && !this.bookInFront)
     }
 }

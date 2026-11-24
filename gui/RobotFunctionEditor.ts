@@ -10,7 +10,7 @@ export default class RobotFunctionEditor {
     private keyboardWasEnabled: boolean | null = null
     private visible = false
 
-    constructor(private scene: MainScene) {
+    constructor(private scene: MainScene, bringForward: () => void = () => {}) {
         this.element = document.createElement("div")
         this.element.className = "robot-function-editor"
         this.element.style.display = "none"
@@ -26,12 +26,16 @@ export default class RobotFunctionEditor {
                 .robot-function-editor button { flex-shrink:0;padding:2px 4px;border:1px solid white;background:#123d12;color:inherit;font:inherit;cursor:pointer; }
                 .robot-function-editor .play-function { background:transparent; }
                 .robot-function-editor .expand-function { margin-left:auto;border:0;background:transparent;outline:none; }
+                .robot-function-editor .delete-function { border:0;background:transparent; }
+                .robot-function-editor .delete-function:not([hidden]) { margin-left:auto; }
+                .robot-function-editor .delete-function:not([hidden]) + .expand-function { margin-left:0; }
                 .robot-function-editor .function-error { margin-top:4px;color:#ffbaba;white-space:pre-wrap;overflow-wrap:anywhere; }
                 .robot-function-editor textarea { box-sizing:border-box;width:100%;min-height:60px;margin-top:4px;padding:4px;border:1px solid white;background:#123d12;color:inherit;font:inherit;line-height:20px;resize:none;overflow:hidden; }
                 .robot-function-editor .add-function { min-height:28px;margin-top:4px;text-align:left; }
             </style>
             <div>Commands: move, canMove, canMine, hasCpu, hasDrill, aim, selectBlock, place, weld, shoot, goToMine, goHome, wait</div>
-            <div>Queries: getLunestone, getCosmorite, getFreeStorage, getMeterRange</div>
+            <div>Queries: getLunestone, getCosmorite, getFreeStorage, getMeterRange, getChatText</div>
+            <div>Chat: print(value)</div>
             <div>Python-like: if/else, while, return, assignments; call functions by name.</div>
             <div class="function-list" aria-label="Robot functions"></div>
             <button type="button" class="add-function">+ Add function</button>
@@ -51,7 +55,8 @@ export default class RobotFunctionEditor {
             name.focus()
             name.select()
         })
-        this.element.addEventListener("focusin", () => {
+        this.element.addEventListener("focusin", event => {
+            if (!(event.target instanceof HTMLInputElement) && !(event.target instanceof HTMLTextAreaElement)) return
             if (this.keyboardWasEnabled !== null) return
             const keyboard = this.scene.input.keyboard
             this.keyboardWasEnabled = keyboard?.enabled ?? false
@@ -61,10 +66,14 @@ export default class RobotFunctionEditor {
             this.scene.player.setVelocity(0, 0)
         })
         this.element.addEventListener("focusout", event => {
-            if (!this.element.contains(event.relatedTarget as Node | null)) this.restoreKeyboard()
+            if (!(event.relatedTarget instanceof HTMLInputElement) &&
+                !(event.relatedTarget instanceof HTMLTextAreaElement)) this.restoreKeyboard()
         })
         for (const event of ["pointerdown", "keydown", "keyup", "wheel"]) {
-            this.element.addEventListener(event, event => event.stopPropagation())
+            this.element.addEventListener(event, event => {
+                if (event.type === "pointerdown") bringForward()
+                event.stopPropagation()
+            })
         }
         document.body.appendChild(this.element)
         this.scene.events.once("shutdown", () => {
@@ -101,6 +110,7 @@ export default class RobotFunctionEditor {
                     <input type="text" aria-label="Function name" spellcheck="false" autocomplete="off">
                     <span>()</span>
                 </span>
+                <button type="button" class="delete-function" aria-label="Delete function" title="Delete function">&#128465;</button>
                 <button type="button" class="expand-function" aria-label="Toggle function body"></button>
             </div>
             <textarea aria-label="Function body" placeholder="Function body..." spellcheck="false" autocapitalize="off"></textarea>
@@ -109,6 +119,7 @@ export default class RobotFunctionEditor {
         const name = row.querySelector<HTMLInputElement>("input")!
         const play = row.querySelector<HTMLButtonElement>(".play-function")!
         const toggle = row.querySelector<HTMLButtonElement>(".expand-function")!
+        const remove = row.querySelector<HTMLButtonElement>(".delete-function")!
         const body = row.querySelector<HTMLTextAreaElement>("textarea")!
         const error = row.querySelector<HTMLDivElement>(".function-error")!
         if (definition.error) {
@@ -130,11 +141,13 @@ export default class RobotFunctionEditor {
             try {
                 if (!robot.program) robot.program = new PythonFunctions(this.scene, robot)
                 robot.program.run(robot.functions!, definition.name, message => {
+                    this.scene.cancelAction()
                     definition.error = message
                     error.textContent = message
                     error.hidden = false
                 })
             } catch (cause) {
+                this.scene.cancelAction()
                 definition.error = cause instanceof Error ? cause.message : String(cause)
                 error.textContent = definition.error
                 error.hidden = false
@@ -146,11 +159,21 @@ export default class RobotFunctionEditor {
             this.resizeBody(body)
         })
         const updateExpansion = () => {
+            remove.hidden = !definition.expanded
             toggle.textContent = definition.expanded ? "\u25B2" : "\u25BC"
             toggle.setAttribute("aria-expanded", String(definition.expanded))
             body.hidden = !definition.expanded
             if (definition.expanded) this.resizeBody(body)
         }
+        remove.addEventListener("click", () => {
+            const functions = this.robot?.functions
+            if (!functions) return
+            const index = functions.indexOf(definition)
+            if (index < 0) return
+            this.robot?.program?.cancel()
+            functions.splice(index, 1)
+            row.remove()
+        })
         toggle.addEventListener("click", () => {
             definition.expanded = !definition.expanded
             updateExpansion()

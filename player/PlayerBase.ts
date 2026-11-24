@@ -12,7 +12,7 @@ export default class PlayerBase extends HPImage {
         this.setImmovable(true).setDepth(BLOCK_DEPTH)
         this.zone = scene.add.circle(x, y, BASE_ZONE_RADIUS, MyColors.blue, 0.15)
             .setDepth(SHADOW_DEPTH - 1)
-        scene.baseLayer.push(this.zone)
+        scene.addWorldObject(this.zone)
         scene.uiCamera.ignore(this.zone)
         scene.physics.add.existing(this.zone, true)
         scene.physics.add.overlap(scene.player, this, () => {

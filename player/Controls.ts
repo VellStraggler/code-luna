@@ -11,7 +11,6 @@ type ControlKeys = {
 export default class Controls {
     private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
     private controls!: ControlKeys
-    typing: boolean = false
     player: Player
     scene: MainScene
 
@@ -43,7 +42,19 @@ export default class Controls {
         return this.cursors.down.isDown || this.controls.down.isDown
     }
     spaceJustDown() {
-        return Phaser.Input.Keyboard.JustDown(this.cursors.space)
+        return !this.isTyping() && Phaser.Input.Keyboard.JustDown(this.cursors.space)
+    }
+
+    isMoving() {
+        return !this.isTyping() &&
+            (Number(this.rightPressed()) !== Number(this.leftPressed()) ||
+             Number(this.downPressed()) !== Number(this.upPressed()))
+    }
+
+    private isTyping() {
+        const active = document.activeElement
+        return this.scene.typing || active instanceof HTMLInputElement ||
+            active instanceof HTMLTextAreaElement || (active instanceof HTMLElement && active.isContentEditable)
     }
 
     onNonButtonClick(pointer: Phaser.Input.Pointer) {
@@ -71,7 +82,8 @@ export default class Controls {
     }
 
     updateMovement(speed: number) {
-        if (this.typing) {
+        if (this.isTyping()) {
+            this.player.setVelocity(0, 0)
             return
         }
 

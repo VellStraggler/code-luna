@@ -53,7 +53,6 @@ export default class ModularBlock extends BaseGameItem {
         this.image.setBodySize(BLOCK_RES-2, BLOCK_RES-2, true)
             .setDrag(DEFAULT_DRAG)
             .setDepth(BLOCK_DEPTH)
-        scene.baseLayer.push(this.image)
         this.updateFreshness()
     }
 
@@ -81,7 +80,7 @@ export default class ModularBlock extends BaseGameItem {
                     .setTintMode(Phaser.TintModes.FILL)
                 this.freshnessImages.set(image, overlay)
                 this.scene.uiCamera.ignore(overlay)
-                this.scene.baseLayer.push(overlay)
+                this.scene.addWorldObject(overlay)
             }
             overlay.setTexture(image.texture.key, image.frame.name)
                 .setPosition(image.x, image.y)
@@ -238,9 +237,19 @@ export default class ModularBlock extends BaseGameItem {
 
     addEnemyCollider(scene: MainScene, offender: HPImage | Phaser.Physics.Arcade.Image) {
         scene.physics.add.collider(offender, this.image, () => {
+            const body = this.image.body
+            if (offender === scene.player && body instanceof Phaser.Physics.Arcade.Body) {
+                scene.restorePlayerCollision(body)
+            }
             if(this.robot.blocks.includes(this)) {
                 this.robot.proxyGlobalBlock = this
             }
+        }, () => {
+            const body = this.image.body
+            if (offender === scene.player && !scene.isPlayerMoving() && body instanceof Phaser.Physics.Arcade.Body) {
+                scene.preventPlayerPush(body)
+            }
+            return true
         })
     }
 

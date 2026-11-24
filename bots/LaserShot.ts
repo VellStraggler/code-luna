@@ -1,4 +1,4 @@
-import { generateId, LASER_DAMAGE, LASER_LIFE, LASER_SPEED } from "../main/constants";
+import { generateId, LASER_DAMAGE, LASER_LIFE, LASER_SPEED, PART_DEPTH } from "../main/constants";
 import MainScene from "../CodeLuna";
 import { XY } from "../main/XY";
 import HPImage from "../main/HPImage";
@@ -31,7 +31,8 @@ export default class LaserShot {
         this.vec = start.getDirVector(destination)
         this.id = generateId()
         // place it at the from-Object
-        this.image = scene.add.rectangle(start.x, start.y, 2, 16, MyColors.red)
+        this.image = scene.add.rectangle(start.x, start.y, 2, 16, MyColors.red).setDepth(PART_DEPTH)
+        scene.addWorldObject(this.image)
         this.image.rotation = Math.atan2(this.vec.y, this.vec.x) + Math.PI / 2
 
         scene.uiCamera.ignore(this.image)

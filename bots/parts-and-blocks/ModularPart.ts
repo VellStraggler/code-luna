@@ -1,6 +1,6 @@
 import {XY, xy} from "../../main/XY"
 import { PartDefinition } from "./PartDefinition";
-import { BLOCK_RES, DRILL_TARGET_RANGE_METERS, F0, PART_DEPTH, PART_DRILL_NAME, WELDER_PART } from "../../main/constants";
+import { BLOCK_RES, DRILL_DEPTH, DRILL_TARGET_RANGE_METERS, F0, PART_DEPTH, PART_DRILL_NAME, WELDER_PART } from "../../main/constants";
 import ModularBlock from "./ModularBlock";
 import IGameItem from "../contracts/IGameItem";
 import MainScene from "../../CodeLuna";
@@ -33,7 +33,7 @@ export class ModularPart extends BaseGameItem {
             scene, 
             parentBlock.globalPos, 
             new HPImage(scene, x, y, assetKey + (partType.availableFrames > 1 ? F0 : ""), true)
-                .setDepth(PART_DEPTH),
+                .setDepth(assetKey === PART_DRILL_NAME ? DRILL_DEPTH : PART_DEPTH),
             partType.assetKey,
             partType.availableFrames -1
         )
@@ -142,11 +142,6 @@ export class ModularPart extends BaseGameItem {
         }
 
         this.updatePosition()
-        // match velocity
-        if (this.parentBlock.image.body) {
-            this.image.setVelocity(this.parentBlock.image.body.velocity.x, this.parentBlock.image.body.velocity.y)
-        }
-
         if (!this.isActive && this.maxFrame > 0) {
             this.currentFrame = 0
             this.image.setTexture(this.getFrameName())

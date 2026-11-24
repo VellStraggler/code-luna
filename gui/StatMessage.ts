@@ -14,10 +14,12 @@ export class UITextLine {
         x:number, 
         y:number, 
         staticText: string,
-        align: string = "left"
+        align: string = "left",
+        fontHeight: number = 16
     ) {
         this.parseOrigin(align)
         this.textObject = scene.add.text(x, y, staticText)
+            .setFontSize(fontHeight)
             .setScrollFactor(0)
             .setDepth(GUI_DEPTH)
             .setOrigin(this.origin.x, this.origin.y)
@@ -46,11 +48,14 @@ export class UIIconButton {
     selected: boolean = false
     private bg: Phaser.GameObjects.Rectangle
     private icon: Phaser.GameObjects.Image
+    private number: Phaser.GameObjects.Text
 
-    constructor(scene: MainScene, x: number, y: number, iconName: string = "null", onClick: () => any, deselectAll: () => any) {
+    constructor(scene: MainScene, x: number, y: number, iconName: string = "null", onClick: () => any, deselectAll: () => any, number: number) {
         this.bg = scene.add.rectangle(x, y, TOOLBOX_WIDTH, TOOLBOX_WIDTH, MyColors.white)
             .setStrokeStyle(0, MyColors.black)
             .setInteractive({ useHandCursor: true })
+            .setScrollFactor(0)
+            .setDepth(GUI_DEPTH)
             .on('pointerdown', () => {
                 if (this.selected) {
                     deselectAll()
@@ -63,6 +68,11 @@ export class UIIconButton {
             
         this.icon = scene.add.image(this.bg.x, this.bg.y, iconName)
             .setScale(2)
+            .setScrollFactor(0)
+            .setDepth(GUI_DEPTH)
+        this.number = scene.add.text(x - TOOLBOX_WIDTH / 2 + 2, y - TOOLBOX_WIDTH / 2 + 1,
+            String(number), { fontSize: "11px", color: "#000000", fontStyle: "bold" })
+            .setScrollFactor(0).setDepth(GUI_DEPTH + 1)
     }
 
     deselect() {
@@ -73,8 +83,21 @@ export class UIIconButton {
         this.selected = true
         this.bg.setStrokeStyle(TOOLBOX_OUTLINE)
     }
-    public getObjects(): (Phaser.GameObjects.Rectangle | Phaser.GameObjects.Image)[] {
-        return [this.bg, this.icon]
+    public getObjects(): (Phaser.GameObjects.Rectangle | Phaser.GameObjects.Image | Phaser.GameObjects.Text)[] {
+        return [this.bg, this.icon, this.number]
+    }
+}
+
+export class UIFormattedStatLine extends UITextLine {
+    constructor(scene: MainScene, x: number, y: number, private format: () => string,
+        align = "left", fontHeight = 16) {
+        super(scene, x, y, format(), align, fontHeight)
+    }
+
+    public override updateState() {
+        const text = this.format()
+        this.textObject.setText(text)
+        return text
     }
 }
 
@@ -89,15 +112,17 @@ export default class UIStatLine extends UITextLine {
         y:number, 
         staticPrefix: string, 
         getVariable: () => any,
-        align: string = "left"
+        align: string = "left",
+        fontHeight: number = 16
     ) {
-        super(scene, x, y, staticPrefix, align)
+        super(scene, x, y, staticPrefix, align, fontHeight)
         this.getVariable = getVariable
         this.statObject = scene.add.text(
             x + this.textObject.width, 
             y, 
             String(getVariable())
         )
+            .setFontSize(fontHeight)
             .setScrollFactor(0)
             .setDepth(GUI_DEPTH)
             .setOrigin(this.origin.x, this.origin.y)
@@ -122,9 +147,10 @@ export class UIIconStatLine extends UIStatLine {
         iconName: string, 
         staticPrefix: string, 
         getVariable: () => any,
-        align: string = "left"
+        align: string = "left",
+        fontHeight: number = 16
     ) {
-        super(scene, x + TEXT_SPACING, y, staticPrefix, getVariable, align)
+        super(scene, x + TEXT_SPACING, y, staticPrefix, getVariable, align, fontHeight)
         this.iconObject = scene.add.image(x, y, iconName)
             .setScrollFactor(0)
             .setOrigin(this.origin.x, this.origin.y)
@@ -147,9 +173,10 @@ export class UITextButtonLine extends UITextLine {
         y:number, 
         staticPrefix: string, 
         onClick: () => any,
-        align: string = "left"
+        align: string = "left",
+        fontHeight: number = 16
     ) {
-        super(scene, x, y, "-" + staticPrefix + "()", align)
+        super(scene, x, y, "-" + staticPrefix + "()", align, fontHeight)
         this.textObject
             .setFontStyle('bold')
             .setInteractive({ useHandCursor: true })
@@ -167,9 +194,10 @@ export class UIStatButtonLine extends UIStatLine {
         y:number, 
         staticPrefix: string, 
         onClick: () => string,
-        align: string = "left"
+        align: string = "left",
+        fontHeight: number = 16
     ) {
-        super(scene, x, y, staticPrefix, () => {return onClick()}, align)
+        super(scene, x, y, staticPrefix, () => {return onClick()}, align, fontHeight)
         this.textObject
             .setFontStyle('bold')
             .setInteractive({ useHandCursor: true })

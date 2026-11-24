@@ -31,14 +31,13 @@ export default class HPImage extends Phaser.Physics.Arcade.Image implements IGam
                 .setAlpha(0.3)
                 .setDepth(SHADOW_DEPTH)
             scene.uiCamera.ignore(this.shadow)
-            scene.baseLayer.push(this.shadow)
+            scene.addWorldObject(this.shadow)
         } else {
             this.shadow = null
         }
-        scene.baseLayer.push(this)
-
         scene.add.existing(this)
         scene.physics.add.existing(this)
+        scene.addWorldObject(this)
         this.scene = scene
         
         /// Health Bar ///
@@ -61,7 +60,8 @@ export default class HPImage extends Phaser.Physics.Arcade.Image implements IGam
             scene.uiCamera.ignore(bar)
         }
         this.hpBar.setOrigin(0,0) //top-left for easy math
-        scene.baseLayer.push(this)
+        scene.addWorldObject(this.hpBarBG)
+        scene.addWorldObject(this.hpBar)
     }
 
     updateShadow() {
@@ -94,7 +94,7 @@ export default class HPImage extends Phaser.Physics.Arcade.Image implements IGam
     }
 
     
-    canShoot(): boolean { return this.scene.mainStats.getGas() - LASER_ENERGY_USE > 0 }
+    canShoot(): boolean { return this.scene.mainStats.getGas() >= LASER_ENERGY_USE }
     shootLaser(): number {
         if (this.canShoot()) {
             this.scene.mainStats.drainGas(LASER_ENERGY_USE)
@@ -154,7 +154,6 @@ export default class HPImage extends Phaser.Physics.Arcade.Image implements IGam
             let body = bar.body as Phaser.Physics.Arcade.Body
             body?.setVelocity(x,y)
         }
-        this.shadow?.setVelocity(x,y)
         this.updateShadow()
         this.updateHPBar()
         return this

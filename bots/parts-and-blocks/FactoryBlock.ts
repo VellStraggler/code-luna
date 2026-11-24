@@ -103,16 +103,17 @@ export default class FactoryBlock extends ModularBlock {
     }
 
     print(): string {
-        if (!this.image.active || !this.robot.blocks.includes(this)) return PrintStrings.unavailable
+        const fail = (message: string) => { this.scene.cancelAction(); return message }
+        if (!this.image.active || !this.robot.blocks.includes(this)) return fail(PrintStrings.unavailable)
         if (this.selectedParts.size > this.selectedBlock.partLimit) {
-            return PrintStrings.tooManyParts(this.selectedBlock.partLimit)
+            return fail(PrintStrings.tooManyParts(this.selectedBlock.partLimit))
         }
         const placement = this.getPrintPlacement(this.outputDirection)
-        if (!placement) return PrintStrings.blocked
+        if (!placement) return fail(PrintStrings.blocked)
         const cost = this.getPrintCost()
         const gas = this.fromUser ? this.scene.mainStats.getGas() : this.robot.storedCosmorite
         const stone = this.fromUser ? this.scene.mainStats.getLunestone() : this.robot.storedLunestone
-        if (gas < cost.gas || stone < cost.stone) return PrintStrings.unaffordable
+        if (gas < cost.gas || stone < cost.stone) return fail(PrintStrings.unaffordable)
 
         if (placement.retreat) {
             this.image.setPosition(placement.retreat.x, placement.retreat.y)

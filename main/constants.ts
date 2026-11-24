@@ -92,6 +92,7 @@ export const BLOCK_FRESHNESS_START_WHITENESS = 0.8
 export const GUI_DEPTH =    500
 export const GUI_BG_DEPTH = 490
 export const HP_BAR_DEPTH = 400
+export const DRILL_DEPTH =  350
 export const PART_DEPTH =   300
 export const BLOCK_DEPTH =  200
 export const SHADOW_DEPTH = 100

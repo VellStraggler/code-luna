@@ -25,7 +25,7 @@ export default class WheelBlock extends ModularBlock {
                 .setDepth(BLOCK_DEPTH + 50)
             this.chassisImages[dir] = chassis
             this.scene.uiCamera.ignore(chassis)
-            this.scene.baseLayer.push(chassis)
+            this.scene.addWorldObject(chassis)
         }
         chassis.setPosition(this.globalPos.x, this.globalPos.y)
             .setRotation(this.determineChassisRotation(dir))

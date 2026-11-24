@@ -77,7 +77,10 @@ export default class FactoryGUI {
         ]
         for (const [direction, x, y, triangle] of directions) {
             const button = this.button(x, y, 24, 24, () => {
-                if (!this.factory || this.factory.isOutputBlocked(direction)) return
+                if (!this.factory || this.factory.isOutputBlocked(direction)) {
+                    this.scene.cancelAction()
+                    return
+                }
                 this.factory.outputDirection = direction
                 this.statusMessage = ""
                 this.update()
@@ -181,8 +184,6 @@ export default class FactoryGUI {
             const blocked = factory.isOutputBlocked(direction)
             button.setStrokeStyle(factory.outputDirection === direction ? 2 : 0, MyColors.white)
                 .setAlpha(blocked ? 0.35 : 1)
-            if (blocked) button.disableInteractive()
-            else button.setInteractive({ useHandCursor: true })
             triangle.setAlpha(blocked ? 0.35 : 1)
             cross.setVisible(blocked)
         }

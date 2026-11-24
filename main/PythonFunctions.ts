@@ -30,6 +30,7 @@ const MAX_CALL_DEPTH = 32
 const COMMAND_ARITY: Record<string, [number, number]> = {
     canMove: [0, 0], canMine: [0, 0], hasCpu: [0, 0], hasDrill: [0, 0],
     getLunestone: [0, 0], getCosmorite: [0, 0], getFreeStorage: [0, 0], getMeterRange: [0, 0],
+    print: [1, 1], getChatText: [0, 1],
     move: [2, 2], aim: [2, 2], selectBlock: [1, 1], place: [2, 3],
     weld: [0, 0], shoot: [2, 2], goToMine: [0, 0], goHome: [0, 0]
 }
@@ -195,6 +196,8 @@ export default class PythonFunctions {
             getCosmorite: () => robot.storedCosmorite,
             getFreeStorage: () => robot.getFreeStorage(),
             getMeterRange: () => robot.getMeterRange(),
+            print: value => { scene.chat.print(String(value)); return null },
+            getChatText: index => index === undefined ? scene.chat.getText() : scene.chat.getText(number(index, "getChatText")),
             move: (x, y) => { robot.move(number(x, "move"), number(y, "move")); return null },
             aim: (x, y) => { robot.aim(xy(number(x, "aim"), number(y, "aim"))); return null },
             selectBlock: (name) => {

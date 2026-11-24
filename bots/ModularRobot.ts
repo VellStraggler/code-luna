@@ -33,6 +33,7 @@ export default class ModularRobot implements IGameFighter{
     public latestCpuPart: CpuPart | null = null
     public latestDrillPart: ModularPart | null = null
     public isDrilling = false
+    private miningBlocked = false
     public guns: ModularPart[] = []
     public wheels: WheelBlock[] = []
     public factoryBlocks: FactoryBlock[] = []
@@ -226,7 +227,9 @@ export default class ModularRobot implements IGameFighter{
     }
 
     private setStoredResource(resource: "storedCosmorite" | "storedLunestone", total: number) {
-        let change = Math.max(0, total) - this.blocks.reduce((sum, block) => sum + block[resource], 0)
+        const current = this.blocks.reduce((sum, block) => sum + block[resource], 0)
+        if (total < 0 && current <= 0) this.scene.cancelAction()
+        let change = Math.max(0, total) - current
         if (change > 0) {
             for (const block of this.blocks) {
                 const free = Math.max(0, block.blockType.storage - block.storedCosmorite - block.storedLunestone)
@@ -563,14 +566,22 @@ export default class ModularRobot implements IGameFighter{
     place(xOffset:number, yOffset: number, factoryBlockIndex = 0): boolean {
         if(this.factoryBlocks.length -1 >= factoryBlockIndex) {
             let block = this.factoryBlocks[factoryBlockIndex]
-            block.setDirection(xOffset, yOffset)
+            if (!block.setDirection(xOffset, yOffset)) {
+                this.scene.cancelAction()
+                return false
+            }
             let response = block.print()
             return (response == PrintStrings.success)
         }
+        this.scene.cancelAction()
         return false
     }
 
     selectBlock(blockName: string = "aluminum") {
+        if (this.factoryBlocks.length === 0 || BlockDefinition.fromAssetKey(blockName) === BlockDefinition.unknown) {
+            this.scene.cancelAction()
+            return
+        }
         for (const block of this.factoryBlocks) {
             block.selectBlock(blockName)
         }
@@ -650,8 +661,10 @@ export default class ModularRobot implements IGameFighter{
         const contact = this.getTouchingDrill()
         if (contact) {
             const { drill, site } = contact
-            const minedAmount = (MINING_RATE_MS * delta)/1000
-            if(this.storageSpace >= this.storedLunestone + this.storedCosmorite + minedAmount) {
+            const minedAmount = Math.min((MINING_RATE_MS * delta)/1000, this.getFreeStorage(),
+                Math.max(0, this.storageSpace - this.storedLunestone - this.storedCosmorite))
+            if (minedAmount > 1e-9) {
+                this.miningBlocked = false
                 this.latestDrillPart?.deactivate()
                 this.latestDrillPart = drill
                 drill.activate()
@@ -660,9 +673,12 @@ export default class ModularRobot implements IGameFighter{
                 site.takeDamage(minedAmount)
                 this.isDrilling = true
             } else {
+                if (!this.miningBlocked) this.scene.cancelAction()
+                this.miningBlocked = true
                 this.stopDrilling()
             }
         } else {
+            this.miningBlocked = false
             this.stopDrilling()
         }
     }
@@ -728,10 +744,11 @@ export default class ModularRobot implements IGameFighter{
     }
     
     public weld() {
-        this.scene.robots.connectWeldingBlocks(this)
+        if (!this.scene.robots.connectWeldingBlocks(this)) this.scene.cancelAction()
     }
 
     public setGoal(goalPosition: XY) {
+        if (!this.canMove() || this.storedCosmorite <= 0) this.scene.cancelAction()
         this.goal = goalPosition
         this.timeIdle = 0
     }

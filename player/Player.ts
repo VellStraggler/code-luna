@@ -81,5 +81,6 @@ export enum PlayerState {
     holdingGun,
     holdingWelder,
     holdingFactoryBlock,
+    holdingHandbook,
     holdingNothing
 }

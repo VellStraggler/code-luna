@@ -32,7 +32,7 @@ export default class BaseGameItem implements IGameItem {
         this.image = image
         this.assetKey = assetKey
         
-        scene.baseLayer.push(this.image)
+        scene.addWorldObject(this.image)
 
         this.updateAnimation(true)
         this.deactivate()

@@ -3,10 +3,11 @@ import MainScene from "../CodeLuna";
 export default class MainStats {
     private lunestone: number;
     private cosmoriteGas: number;
+    public gasToShip = 0
 
     private energyUsePerMs: number = 0;
 
-    constructor(lunestone: number = 0, cosmoriteGas: number = 0) {
+    constructor(lunestone: number = 0, cosmoriteGas: number = 0, private onFailure: () => void = () => {}) {
         this.lunestone = lunestone;
         this.cosmoriteGas = cosmoriteGas;
 
@@ -33,12 +34,14 @@ export default class MainStats {
     }
 
     incGas(amount: number) {
+        if (amount < 0 && this.cosmoriteGas <= 0) this.onFailure()
         this.cosmoriteGas = Math.max(amount + this.cosmoriteGas, 0);
     }
     incLunestone(amount: number) {
+        if (amount < 0 && this.lunestone <= 0) this.onFailure()
         this.lunestone = Math.max(amount + this.lunestone, 0);
     }
     incCosmorite(amount: number) {
-        this.cosmoriteGas = Math.max(amount + this.cosmoriteGas, 0);
+        this.incGas(amount)
     }
 }
