@@ -1,7 +1,8 @@
 # Program Name: Code: Luna
 
 ## Dev Running Instructions:
-run command: ```npx vite```
+Install dependencies with ```npm install```, then start the development server with ```npm run dev```.
+Run unit tests with ```npm test``` and type checks with ```npm run typecheck```. Test files live in ```test/``` and are not included in the production bundle.
 
 ## Language(s)/Framework(s): 
 Typescript in Phaser, ported to desktop with Electron, backend server running in C# on AWS EC2

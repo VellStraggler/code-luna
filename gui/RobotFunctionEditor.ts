@@ -2,6 +2,7 @@ import type MainScene from "../CodeLuna"
 import type ModularRobot from "../bots/ModularRobot"
 import { GUI_DEPTH, GUI_MARGIN } from "../main/constants"
 import PythonFunctions, { type RobotFunction } from "../main/PythonFunctions"
+import { removeLegacyStarterFunctions } from "../main/gameRules"
 
 export default class RobotFunctionEditor {
     private element: HTMLDivElement
@@ -16,7 +17,7 @@ export default class RobotFunctionEditor {
         this.element.style.display = "none"
         this.element.innerHTML = `
             <style>
-                .robot-function-editor { position:fixed;box-sizing:border-box;flex-direction:column;color:white;font:14px monospace;transform-origin:top left;z-index:${GUI_DEPTH}; }
+                .robot-function-editor { position:fixed;box-sizing:border-box;flex-direction:column;color:white;font:14px monospace;transform-origin:top left;z-index:${GUI_DEPTH + 4}; }
                 .robot-function-editor .function-list { flex:1;min-height:0;overflow-y:scroll;overflow-x:hidden;overscroll-behavior:contain;scrollbar-color:white #173e17;scrollbar-width:thin; }
                 .robot-function-editor section { padding:2px 4px 6px 0;border-bottom:1px solid #ffffff66; }
                 .robot-function-editor .function-heading { display:flex;align-items:center;gap:4px;min-height:28px; }
@@ -33,10 +34,6 @@ export default class RobotFunctionEditor {
                 .robot-function-editor textarea { box-sizing:border-box;width:100%;min-height:60px;margin-top:4px;padding:4px;border:1px solid white;background:#123d12;color:inherit;font:inherit;line-height:20px;resize:none;overflow:hidden; }
                 .robot-function-editor .add-function { min-height:28px;margin-top:4px;text-align:left; }
             </style>
-            <div>Commands: move, canMove, canMine, hasCpu, hasDrill, aim, selectBlock, place, weld, shoot, goToMine, goHome, wait</div>
-            <div>Queries: getLunestone, getCosmorite, getFreeStorage, getMeterRange, getChatText</div>
-            <div>Chat: print(value)</div>
-            <div>Python-like: if/else, while, return, assignments; call functions by name.</div>
             <div class="function-list" aria-label="Robot functions"></div>
             <button type="button" class="add-function">+ Add function</button>
             <button type="button" class="stop-function">Stop program</button>
@@ -88,15 +85,8 @@ export default class RobotFunctionEditor {
         this.robot = robot
         this.viewport.replaceChildren()
         if (!robot) return
-        let functions = robot.functions
-        if (!functions) {
-            functions = [
-                { name: "sendToMine", body: "goToMine()", expanded: false },
-                { name: "sendHome", body: "goHome()", expanded: false },
-                { name: "weldNearby", body: "weld()", expanded: false }
-            ]
-            robot.functions = functions
-        }
+        const functions = removeLegacyStarterFunctions(robot.functions ?? [])
+        robot.functions = functions
         for (const definition of functions) this.appendFunction(definition)
         this.viewport.scrollTop = 0
     }

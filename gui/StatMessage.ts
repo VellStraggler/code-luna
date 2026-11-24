@@ -49,22 +49,18 @@ export class UIIconButton {
     private bg: Phaser.GameObjects.Rectangle
     private icon: Phaser.GameObjects.Image
     private number: Phaser.GameObjects.Text
+    private readonly onClick: () => any
+    private readonly deselectAll: () => any
 
     constructor(scene: MainScene, x: number, y: number, iconName: string = "null", onClick: () => any, deselectAll: () => any, number: number) {
+        this.onClick = onClick
+        this.deselectAll = deselectAll
         this.bg = scene.add.rectangle(x, y, TOOLBOX_WIDTH, TOOLBOX_WIDTH, MyColors.white)
             .setStrokeStyle(0, MyColors.black)
             .setInteractive({ useHandCursor: true })
             .setScrollFactor(0)
             .setDepth(GUI_DEPTH)
-            .on('pointerdown', () => {
-                if (this.selected) {
-                    deselectAll()
-                } else {
-                    deselectAll()
-                    onClick()
-                    this.select()
-                }
-            })
+            .on('pointerdown', () => this.activate())
             
         this.icon = scene.add.image(this.bg.x, this.bg.y, iconName)
             .setScale(2)
@@ -79,6 +75,17 @@ export class UIIconButton {
         this.selected = false
         this.bg.setStrokeStyle(0)
     }
+
+    activate() {
+        if (this.selected) {
+            this.deselectAll()
+        } else {
+            this.deselectAll()
+            this.onClick()
+            this.select()
+        }
+    }
+
     select() {
         this.selected = true
         this.bg.setStrokeStyle(TOOLBOX_OUTLINE)

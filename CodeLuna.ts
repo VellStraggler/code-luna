@@ -19,6 +19,8 @@ import { BlockDefinition } from './bots/parts-and-blocks/BlockDefinition'
 import ModularBlock from './bots/parts-and-blocks/ModularBlock'
 import RobotCache from './main/RobotCache'
 import PublicChat from './main/PublicChat'
+import ResourceDrop from './main/ResourceDrop'
+import { PLACE_SOUND_KEYS } from './main/gameRules'
 
 export default class MainScene extends Phaser.Scene {
     player!: Player
@@ -30,6 +32,7 @@ export default class MainScene extends Phaser.Scene {
     mineSites: HPImage[] = []
     mainStats!: MainStats
     readonly chat = new PublicChat()
+    readonly resourceDrops: ResourceDrop[] = []
     GUI!: GUI
     uiCamera!: Phaser.Cameras.Scene2D.Camera
     worldLayer!: Phaser.GameObjects.Layer
@@ -47,6 +50,8 @@ export default class MainScene extends Phaser.Scene {
     laserSound!: HTMLAudioElement
     painSound!: HTMLAudioElement
     drillSound!: Phaser.Sound.BaseSound
+    walkSound!: Phaser.Sound.BaseSound
+    robotMoveSound!: Phaser.Sound.BaseSound
 
     constructor() {
         super('MainScene')
@@ -72,11 +77,14 @@ export default class MainScene extends Phaser.Scene {
         this.load.audio("drilling", audioPre + "drilling.wav", {loop: true, volume: 0.5})
         this.load.audio("weld", audioPre + "weld.mp3")
         this.load.audio("cancelled", audioPre + "cancelled.mp3")
+        for (const key of PLACE_SOUND_KEYS) this.load.audio(key, audioPre + "place.mp3")
         this.painSound = new Audio(prefix + "audio/pain.mp3")
     }
     
     create() {
         this.drillSound = this.sound.add("drilling", { loop: true, volume: 0.5 })
+        this.walkSound = this.sound.add("walk")
+        this.robotMoveSound = this.sound.add("robotMove")
         this.input.setTopOnly(true)
         /// CAMERA ///
         const camera = this.cameras.main
@@ -84,11 +92,12 @@ export default class MainScene extends Phaser.Scene {
         const zoomSpeed = 0.005
 
         this.input.on('wheel', (
-            _pointer: Phaser.Input.Pointer, 
+            pointer: Phaser.Input.Pointer,
             _gameObjects: Phaser.GameObjects.GameObject[], 
             _deltaX: number, 
             deltaY: number
             ) => {
+            if (this.GUI.isPointerOverChat(pointer.x, pointer.y)) return
 
             let newZoom = camera.zoom - deltaY * zoomSpeed
             newZoom = Phaser.Math.Clamp(newZoom, 0.1, 3)
@@ -259,6 +268,12 @@ export default class MainScene extends Phaser.Scene {
         this.GUI.update()
 
         this.mainStats.deltaDrainGas(delta)
+        this.resourceDrops.splice(0, this.resourceDrops.length, ...this.resourceDrops.filter(drop =>
+            drop.update(delta, this.player, (texture, amount) => {
+                if (texture === "icon-cosmorite") this.mainStats.incCosmorite(amount)
+                else this.mainStats.incLunestone(amount)
+            })
+        ))
 
         /// ROBOT POSITIONS ///
         for(const robotI of this.robots) {
@@ -369,6 +384,7 @@ export default class MainScene extends Phaser.Scene {
             const y = Math.round(pointer.worldY/BLOCK_RES) * BLOCK_RES
             this.robots.push(ModularRobot.create(this, x, y, BlockDefinition.factory)
                 .addEnemyCollider(this.player))
+            this.sound.play("place")
         } else this.cancelAction()
     }
     public debug_summonRobot() {
@@ -388,9 +404,14 @@ const config: Phaser.Types.Core.GameConfig = {
     width: WINDOW.x,
     height: WINDOW.y,
     backgroundColor: '#444444',
+    fps: {
+        target: 60,
+        forceSetTimeOut: true
+    },
     physics: {
         default: "arcade",
         arcade: {
+            fps: 60,
             debug: false //show hitboxes
         }
     },

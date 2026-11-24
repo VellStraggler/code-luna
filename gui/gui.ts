@@ -11,6 +11,9 @@ import FactoryBlock from "../bots/parts-and-blocks/FactoryBlock"
 import FactoryGUI from "./FactoryGUI"
 import { PlayerState } from "../player/Player"
 import Handbook from "./Handbook"
+import RobotChatPanel from "./RobotChatPanel"
+import UIStatLine from "./StatMessage"
+import { isStorageCapacityReached } from "../main/gameRules"
 
 type RobotResource = "storedLunestone" | "storedCosmorite"
 type NotifierTarget = CpuPart | FactoryBlock
@@ -21,7 +24,7 @@ export default class GUI {
     mainStats: MainStats
     public hud!: UIColumn
     private quota!: UIColumn
-    private chatText!: Phaser.GameObjects.Text
+    private chatPanel!: RobotChatPanel
     private baseArrow!: Phaser.GameObjects.Graphics
     private handbook!: Handbook
     private bookInFront = false
@@ -68,6 +71,7 @@ export default class GUI {
         this.mainStats = mainStats
 
         this.initHud()
+        this.chatPanel = new RobotChatPanel(this.scene, this.scene.chat)
         this.initMonitor()
         this.initPlayerTools()
         this.initCommandGUI()
@@ -75,6 +79,21 @@ export default class GUI {
         this.factoryGUI = new FactoryGUI(this.scene)
         this.robotFunctionEditor = new RobotFunctionEditor(this.scene, () => this.bringMonitorForward())
         this.handbook = new Handbook(this.scene, () => this.bringBookForward(), () => this.closeBook())
+        const focusMonitorOnCanvasPointerDown = (event: PointerEvent) => {
+            if (!this.handbook.isVisible || !this.monitorContainer.visible) return
+            const canvas = this.scene.game.canvas
+            const bounds = canvas.getBoundingClientRect()
+            const x = (event.clientX - bounds.left) * this.scene.scale.gameSize.width / bounds.width
+            const y = (event.clientY - bounds.top) * this.scene.scale.gameSize.height / bounds.height
+            if (x >= this.monitorContainer.x && x <= this.monitorContainer.x + this.monitorContainer.width &&
+                y >= this.monitorContainer.y && y <= this.monitorContainer.y + this.monitorContainer.height) {
+                this.bringMonitorForward()
+            }
+        }
+        this.scene.game.canvas.addEventListener("pointerdown", focusMonitorOnCanvasPointerDown, true)
+        this.scene.events.once("shutdown", () =>
+            this.scene.game.canvas.removeEventListener("pointerdown", focusMonitorOnCanvasPointerDown, true)
+        )
         this.monitorScreens[0].add([
             ...this.baseGUI.getAsGameObjects(),
             ...this.launchControls,
@@ -116,9 +135,6 @@ export default class GUI {
             .addIconStatLine('part-battery', 'x', () => this.mainStats.getEnergyUseMs() * 1000)
         this.quota = new UIColumn(this.scene, WINDOW.x - TEXT_SPACING, TEXT_SPACING, true, "right")
             .addFormattedStatLine(() => `GAS QUOTA: ${this.mainStats.gasToShip.toFixed(1)}/1000`, 22)
-        this.chatText = this.scene.add.text(TEXT_SPACING, WINDOW.y - TEXT_SPACING, "", {
-            fontSize: "13px", color: "#ffffff", backgroundColor: "#00000099", wordWrap: { width: 250 }
-        }).setOrigin(0, 1).setScrollFactor(0).setDepth(GUI_DEPTH)
         this.baseArrow = this.scene.add.graphics().setScrollFactor(0).setDepth(GUI_DEPTH - 1)
     }
 
@@ -310,7 +326,7 @@ export default class GUI {
         }
         this.hud.update()
         this.quota.update()
-        this.chatText.setText(this.scene.chat.getText().split("\n").slice(-5).join("\n"))
+        this.chatPanel.update()
         this.selectNotifierTarget()
         this.updateFactoryGUI()
         this.updateRobotGUI()
@@ -321,11 +337,13 @@ export default class GUI {
         this.robotStatsGUI.update()
         const capacity = this.robotStatsGUI.list[this.robotStatsGUI.list.length - 1]
         const robot = this.robotOfCPU
-        const full = !!robot && robot.storageSpace > 0 &&
-            robot.storedLunestone + robot.storedCosmorite >= robot.storageSpace - 1e-6
-        capacity.getObjects().forEach(object => {
-            if (object instanceof Phaser.GameObjects.Text) object.setColor(full ? "#ff3333" : "#ffffff")
-        })
+        const full = !!robot && isStorageCapacityReached(
+            robot.storedLunestone + robot.storedCosmorite,
+            robot.storageSpace
+        )
+        if (capacity instanceof UIStatLine) {
+            capacity.statObject.setColor(full ? "#ff3333" : "#ffffff")
+        }
         if (this.robotGUI.isVisible && !this.bookInFront) this.robotFunctionEditor.position(this.monitorScreens[0])
         this.updateBaseArrow()
     }
@@ -454,10 +472,10 @@ export default class GUI {
             .addIconButton(FACTORY_BLOCK, () => this.scene.player.toggleHoldingFactoryBlock())
             .addIconButton("null", () => {
                 this.scene.player.playerState = PlayerState.holdingHandbook
-                this.handbook.container.setVisible(true)
+                this.handbook.setVisible(true)
                 this.bringBookForward()
                 return true
-            })
+            }, false)
     }
 
     private initCpuGUI() {
@@ -577,9 +595,8 @@ export default class GUI {
 
     public getUILayer(): Phaser.GameObjects.Layer  {
         const uiLayer = this.scene.add.layer(this.hud.getAsGameObjects())
-        uiLayer.add([...this.quota.getAsGameObjects(), this.chatText, this.baseArrow, ...this.playerTools.getAsGameObjects()])
+        uiLayer.add([...this.quota.getAsGameObjects(), this.chatPanel.container, this.baseArrow, ...this.playerTools.getAsGameObjects()])
         uiLayer.add(this.monitorContainer)
-        uiLayer.add(this.handbook.container)
         return uiLayer
     }
 
@@ -608,15 +625,20 @@ export default class GUI {
         this.closeMonitor()
     }
 
+    public selectToolbarItem(index: number) {
+        this.playerTools.activateIconButton(index)
+    }
+
     private bringBookForward() {
         this.bookInFront = true
-        this.handbook.container.setDepth(GUI_DEPTH + 2)
+        this.handbook.setAboveGame(true)
+        this.handbook.position()
         this.monitorContainer.setDepth(GUI_DEPTH)
-        this.robotFunctionEditor.setVisible(false)
     }
 
     private bringMonitorForward() {
         this.bookInFront = false
+        this.handbook.setAboveGame(false)
         this.monitorContainer.setDepth(GUI_DEPTH + 3)
         if (this.robotGUI.isVisible) {
             this.robotFunctionEditor.setVisible(true)
@@ -624,9 +646,12 @@ export default class GUI {
         }
     }
 
-    private closeBook() {
-        this.handbook.container.setVisible(false)
-        if (this.scene.player.playerState === PlayerState.holdingHandbook) this.playerTools.deselectButtons()
+    public closeBook() {
+        this.handbook.setVisible(false)
+        if (this.scene.player.playerState === PlayerState.holdingHandbook) {
+            this.scene.player.playerState = PlayerState.holdingNothing
+            this.playerTools.iconButtons.forEach(button => button.deselect())
+        }
         this.bringMonitorForward()
     }
 
@@ -692,40 +717,20 @@ export default class GUI {
             (WINDOW.y / 2 - 24) / Math.max(Math.abs(dy), 1e-9))
         const tipX = WINDOW.x / 2 + dx * t
         const tipY = WINDOW.y / 2 + dy * t
-        const verticalEdge = Math.abs(tipX - 24) < 0.01 || Math.abs(tipX - (WINDOW.x - 24)) < 0.01
-        const obstacles: Phaser.Geom.Rectangle[] = []
-        if (this.monitorContainer.visible) obstacles.push(new Phaser.Geom.Rectangle(
-            this.monitorContainer.x, this.monitorContainer.y, this.monitorContainer.width, this.monitorContainer.height))
-        if (this.handbook.container.visible) obstacles.push(new Phaser.Geom.Rectangle(
-            this.handbook.container.x, this.handbook.container.y, 300, 500))
-        for (const object of [...this.hud.getAsGameObjects(), ...this.quota.getAsGameObjects(),
-            ...this.playerTools.getAsGameObjects(), this.chatText]) {
-            if (object.visible && (!(object instanceof Phaser.GameObjects.Text) || object.text)) obstacles.push(object.getBounds())
-        }
-        for (let offset = 0; offset <= 800; offset += 8) {
-            for (const sign of offset === 0 ? [1] : [1, -1]) {
-                const tx = verticalEdge ? tipX : Phaser.Math.Clamp(tipX + offset * sign, 24, WINDOW.x - 24)
-                const ty = verticalEdge ? Phaser.Math.Clamp(tipY + offset * sign, 24, WINDOW.y - 24) : tipY
-                const angle = Math.atan2(y - ty, x - tx)
-                const ux = Math.cos(angle), uy = Math.sin(angle)
-                const px = -uy, py = ux
-                const points = [
-                    new Phaser.Math.Vector2(tx, ty),
-                    new Phaser.Math.Vector2(tx - ux * 32 + px * 13, ty - uy * 32 + py * 13),
-                    new Phaser.Math.Vector2(tx - ux * 25, ty - uy * 25),
-                    new Phaser.Math.Vector2(tx - ux * 32 - px * 13, ty - uy * 32 - py * 13)
-                ]
-                const left = Math.min(...points.map(point => point.x))
-                const top = Math.min(...points.map(point => point.y))
-                const bounds = new Phaser.Geom.Rectangle(left, top,
-                    Math.max(...points.map(point => point.x)) - left,
-                    Math.max(...points.map(point => point.y)) - top)
-                if (left < 0 || top < 0 || bounds.right > WINDOW.x || bounds.bottom > WINDOW.y ||
-                    obstacles.some(obstacle => Phaser.Geom.Intersects.RectangleToRectangle(bounds, obstacle))) continue
-                this.baseArrow.fillStyle(0xffffff, 0.9).fillPoints(points, true)
-                return
-            }
-        }
+        const angle = Math.atan2(y - tipY, x - tipX)
+        const ux = Math.cos(angle), uy = Math.sin(angle)
+        const px = -uy, py = ux
+        const points = [
+            new Phaser.Math.Vector2(tipX, tipY),
+            new Phaser.Math.Vector2(tipX - ux * 32 + px * 13, tipY - uy * 32 + py * 13),
+            new Phaser.Math.Vector2(tipX - ux * 25, tipY - uy * 25),
+            new Phaser.Math.Vector2(tipX - ux * 32 - px * 13, tipY - uy * 32 - py * 13)
+        ]
+        this.baseArrow.fillStyle(0x87cefa, 0.9).fillPoints(points, true)
+    }
+
+    public isPointerOverChat(x: number, y: number) {
+        return this.chatPanel.containsPoint(x, y)
     }
 
     get isFactoryOpen() {

@@ -88,8 +88,11 @@ export default class RobotCache {
                     if (index > 0) robot.addBlockType(BlockDefinition.fromAssetKey(data.type), data.position.x / BLOCK_RES, data.position.y / BLOCK_RES)
                     const block = robot.blocks[index]
                     block.localPos = xy(data.position.x, data.position.y)
-                    block.globalPos = robot.position.add(block.localPos)
-                    block.image.setPosition(block.globalPos.x, block.globalPos.y)
+                    block.image.setPosition(
+                        robot.position.x + block.localPos.x,
+                        robot.position.y + block.localPos.y
+                    )
+                    block.image.body?.updateFromGameObject()
                     for (const part of data.parts) {
                         block.addPart(this.scene, PartDefinition.fromAssetKey(part.type), robot)
                         const added = block.modularParts[block.modularParts.length - 1]
@@ -125,7 +128,7 @@ export default class RobotCache {
             }
             return true
         } catch (error) {
-            for (const robot of restored) robot.destroy()
+            for (const robot of restored) robot.destroy(false)
             this.disable(error)
             return false
         }

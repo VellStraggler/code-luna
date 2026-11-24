@@ -29,8 +29,8 @@ export default class CpuPart extends ModularPart {
         if (this.player == null) return 10000
         const playerPosition = this.player.getPosition()
         const distance = Phaser.Math.Distance.Between(
-            this.parentBlock.globalPos.x,
-            this.parentBlock.globalPos.y,
+            this.parentBlock.image.x,
+            this.parentBlock.image.y,
             playerPosition.x,
             playerPosition.y
         )

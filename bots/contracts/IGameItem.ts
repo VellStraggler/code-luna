@@ -4,7 +4,6 @@ import { XY } from "../../main/XY"
 export default interface IGameItem {
     image: Phaser.Physics.Arcade.Image
     readonly id: number
-    globalPos: XY
     localPos: XY
     currentFrame: number
     maxFrame: number

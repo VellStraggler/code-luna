@@ -157,7 +157,7 @@ export default class UIColumn {
         return this
     }
 
-    public addIconButton(iconName: string, fun: () => boolean) {
+    public addIconButton(iconName: string, fun: () => boolean, closeMonitor = true) {
         this.iconButtons.push(
             new UIIconButton(
                 this.scene, 
@@ -165,7 +165,7 @@ export default class UIColumn {
                 this.latestY, 
                 iconName, 
                 () => {
-                    this.scene.GUI.selectTool()
+                    if (closeMonitor) this.scene.GUI.selectTool()
                     fun()
                 },
                 () => this.deselectButtons(), this.iconButtons.length + 1)
@@ -175,8 +175,18 @@ export default class UIColumn {
     }
 
     public deselectButtons() {
+        if (this.scene.player.playerState === PlayerState.holdingHandbook) {
+            this.scene.GUI.closeBook()
+            return
+        }
+        const wasEquipped = this.scene.player.playerState !== PlayerState.holdingNothing
+        if (wasEquipped) this.scene.sound.play("unequip")
         this.scene.player.playerState = PlayerState.holdingNothing
         for (const button of this.iconButtons) button.deselect()
+    }
+
+    public activateIconButton(index: number) {
+        this.iconButtons[index]?.activate()
     }
 
     public getAsGameObjects(): (Phaser.GameObjects.Text | Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle)[] {

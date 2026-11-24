@@ -1,5 +1,5 @@
 import {XY, xy} from "../../main/XY"
-import { BLOCK_DEPTH, BLOCK_FRESHNESS_MS, BLOCK_FRESHNESS_START_WHITENESS, BLOCK_RES, DEFAULT_DRAG, DIRECTION_OFFSETS, generateId, MAX_SPEED, PART_CPU_NAME, PART_DRILL_NAME, STARTING_GAS_PER_ITEM } from "../../main/constants";
+import { BLOCK_DEPTH, BLOCK_FRESHNESS_MS, BLOCK_FRESHNESS_START_WHITENESS, BLOCK_RES, DEFAULT_DRAG, DIRECTION_OFFSETS, FRAME_TIME_MS, MAX_SPEED, PART_CPU_NAME, PART_DRILL_NAME, STARTING_GAS_PER_ITEM } from "../../main/constants";
 import { ModularPart } from "./ModularPart";
 import { BlockDefinition } from "./BlockDefinition";
 import MainScene from "../../CodeLuna";
@@ -10,6 +10,8 @@ import ModularRobots from "../ModularRobots";
 import CpuPart from "./CpuPart";
 import BaseGameItem from "../contracts/BaseGameItem";
 import * as Phaser from 'phaser'
+import ResourceDrop from "../../main/ResourceDrop"
+import { calculateBlockDropResources } from "../../main/gameRules"
 
 
 export default class ModularBlock extends BaseGameItem {
@@ -25,6 +27,7 @@ export default class ModularBlock extends BaseGameItem {
     createdAt: number
     printedBy: ModularBlock | null = null
     private freshnessImages = new Map<Phaser.GameObjects.Image, Phaser.GameObjects.Image>()
+    private resourcesDropped = false
 
     constructor(
         scene: MainScene,
@@ -32,14 +35,13 @@ export default class ModularBlock extends BaseGameItem {
         blockType: BlockDefinition,
         robot: ModularRobot
     ) {
-        let globalPos = robot.getPosition()
-        let localPos = offset
-        let x = globalPos.x + localPos.x
-        let y = globalPos.y + localPos.y
+        const localPos = offset
+        const position = robot.getPosition()
+        const x = position.x + localPos.x
+        const y = position.y + localPos.y
 
         super(
             scene,
-            xy(x, y),
             new HPImage(scene, x, y, blockType.assetKey),
             blockType.assetKey,
             blockType.availableFrames -1
@@ -117,8 +119,15 @@ export default class ModularBlock extends BaseGameItem {
             this.robot.blocks.some(existing => existing.localPos.equals(block.localPos.add(offset)))
         )) return false
 
+        const sparkX = (this.image.x + otherBlock.image.x) / 2
+        const sparkY = (this.image.y + otherBlock.image.y) / 2
         this.robot.position = xy(this.image.x, this.image.y).subtract(this.localPos)
         this.robot.absorb(otherBlock.robot, offset)
+        const spark = this.scene.add.image(sparkX, sparkY, "null")
+            .setDepth(BLOCK_DEPTH + 1)
+        this.scene.uiCamera.ignore(spark)
+        this.scene.addWorldObject(spark)
+        this.scene.time.delayedCall(FRAME_TIME_MS, () => spark.destroy())
         this.scene.sound.play("weld")
         return true
     }
@@ -194,6 +203,26 @@ export default class ModularBlock extends BaseGameItem {
         this.robot.takeDamage(damageAmount, this)
     }
 
+    dropResources() {
+        if (this.resourcesDropped) return
+        this.resourcesDropped = true
+        const resources = calculateBlockDropResources(
+            this.blockType,
+            this.modularParts.map(part => part.partType),
+            { cosmorite: this.storedCosmorite, lunestone: this.storedLunestone }
+        )
+        if (resources.cosmorite > 0) {
+            this.scene.resourceDrops.push(new ResourceDrop(
+                this.scene, this.image.x, this.image.y, "icon-cosmorite", resources.cosmorite
+            ))
+        }
+        if (resources.lunestone > 0) {
+            this.scene.resourceDrops.push(new ResourceDrop(
+                this.scene, this.image.x, this.image.y, "icon-lunestone", resources.lunestone
+            ))
+        }
+    }
+
     /** Strength sets the 1-damage laser hit count (minimum one).
      * Block and part redness tracks health lost; detaching resets health and tint.
      */
@@ -253,7 +282,8 @@ export default class ModularBlock extends BaseGameItem {
         })
     }
 
-    override destroy() {
+    override destroy(dropResources = true) {
+        if (dropResources) this.dropResources()
         for (const overlay of this.freshnessImages.values()) overlay.destroy()
         this.freshnessImages.clear()
         this.modularParts.forEach(part => part.destroy())
@@ -261,24 +291,15 @@ export default class ModularBlock extends BaseGameItem {
         super.destroy()
     }
 
-    /** 
-     * Recognizes when it becomes a parent block and sets its own global position. Otherwise 
-     * update based on the global position.
-     * Handles velocity clamping as well
-    */
+    /** Keeps attached block parts aligned and clamps velocity. */
     override update(animateScene: boolean = false) {
-        this.image.update()
-        if (this.image.body == undefined) return
-            // Derive position from physics
-             
-        let newPos = this.image.getCenter()
-        this.globalPos.x = newPos.x
-        this.globalPos.y = newPos.y 
+        const body = this.image.body
+        if (!body) return
         this.image.updateShadow()
 
         // velocity clamping
-        if (this.image.body!.velocity.length() > MAX_SPEED) {
-            this.image.body?.velocity.normalize().scale(MAX_SPEED)
+        if (body.velocity.length() > MAX_SPEED) {
+            body.velocity.normalize().scale(MAX_SPEED)
         }
 
         const animateRobot = animateScene && this.robot.hasCpu()

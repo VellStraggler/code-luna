@@ -13,6 +13,7 @@ export default class Controls {
     private controls!: ControlKeys
     player: Player
     scene: MainScene
+    private wasMoving = false
 
     constructor(scene: MainScene, player: Player) {
         this.cursors = scene.input.keyboard!.createCursorKeys()
@@ -24,6 +25,14 @@ export default class Controls {
             left:   Phaser.Input.Keyboard.KeyCodes.A,
             right:  Phaser.Input.Keyboard.KeyCodes.D
         }) as ControlKeys
+        const onToolbarKeyDown = (event: KeyboardEvent) => {
+            if (event.repeat || this.isTyping()) return
+            const index = ["Digit1", "Digit2", "Digit3", "Digit4", "Numpad1", "Numpad2", "Numpad3", "Numpad4"]
+                .indexOf(event.code)
+            if (index >= 0) this.scene.GUI.selectToolbarItem(index % 4)
+        }
+        window.addEventListener("keydown", onToolbarKeyDown)
+        scene.events.once("shutdown", () => window.removeEventListener("keydown", onToolbarKeyDown))
     }
 
     leftPressed() {
@@ -84,6 +93,7 @@ export default class Controls {
     updateMovement(speed: number) {
         if (this.isTyping()) {
             this.player.setVelocity(0, 0)
+            this.wasMoving = false
             return
         }
 
@@ -116,6 +126,9 @@ export default class Controls {
             goY *= .7
         }
         this.player.setVelocity(goX * speed, goY * speed)
+        const moving = goX !== 0 || goY !== 0
+        if (moving && !this.wasMoving) this.scene.walkSound.play()
+        this.wasMoving = moving
     }
 
 }

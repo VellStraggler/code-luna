@@ -26,12 +26,11 @@ export class ModularPart extends BaseGameItem {
     constructor(scene: MainScene, parentBlock: ModularBlock, assetKey: string) {
 
         const partType = PartDefinition.fromAssetKey(assetKey)
-        let x = parentBlock.globalPos.x + partType.offset.x
-        let y = parentBlock.globalPos.y + partType.offset.y
+        let x = parentBlock.image.x + partType.offset.x
+        let y = parentBlock.image.y + partType.offset.y
 
         super(
             scene, 
-            parentBlock.globalPos, 
             new HPImage(scene, x, y, assetKey + (partType.availableFrames > 1 ? F0 : ""), true)
                 .setDepth(assetKey === PART_DRILL_NAME ? DRILL_DEPTH : PART_DEPTH),
             partType.assetKey,
@@ -68,9 +67,10 @@ export class ModularPart extends BaseGameItem {
         const angle = orbiting ? rotation : 0
         const cos = Math.cos(angle)
         const sin = Math.sin(angle)
+        const parentPosition = xy(this.parentBlock.image.x, this.parentBlock.image.y)
         return xy(
-            this.parentBlock.globalPos.x + offset.x * cos - offset.y * sin,
-            this.parentBlock.globalPos.y + offset.x * sin + offset.y * cos
+            parentPosition.x + offset.x * cos - offset.y * sin,
+            parentPosition.y + offset.x * sin + offset.y * cos
         )
     }
 
@@ -127,7 +127,7 @@ export class ModularPart extends BaseGameItem {
     }
 
     override update(animateFrame: boolean = true) {
-        const center = this.parentBlock.globalPos
+        const center = xy(this.parentBlock.image.x, this.parentBlock.image.y)
         if (this.assetKey === PART_DRILL_NAME) {
             this.updatePosition()
             const site = this.scene.getNearestMineSite(

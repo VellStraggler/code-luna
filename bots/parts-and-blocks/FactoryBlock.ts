@@ -143,6 +143,7 @@ export default class FactoryBlock extends ModularBlock {
         }
         this.scene.robots.push(printed)
         this.scene.robots.connectFreshBlocks()
+        this.scene.sound.play("print")
         return PrintStrings.success
     }
 }

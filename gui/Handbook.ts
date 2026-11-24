@@ -1,5 +1,5 @@
 import type MainScene from "../CodeLuna"
-import { GUI_DEPTH, WINDOW } from "../main/constants"
+import { WINDOW } from "../main/constants"
 
 const pages = [
     {
@@ -43,60 +43,169 @@ const pages = [
 ]
 
 export default class Handbook {
-    readonly container: Phaser.GameObjects.Container
+    readonly element: HTMLElement
     private page = 0
-    private title: Phaser.GameObjects.Text
-    private body: Phaser.GameObjects.Text
-    private pageNumber: Phaser.GameObjects.Text
-    private back: Phaser.GameObjects.Text
-    private next: Phaser.GameObjects.Text
+    private readonly title: HTMLHeadingElement
+    private readonly body: HTMLDivElement
+    private readonly pageNumber: HTMLSpanElement
+    private readonly back: HTMLButtonElement
+    private readonly next: HTMLButtonElement
+    private positionX = 20
+    private positionY = (WINDOW.y - 500) / 2
+    private scaleX = 1
+    private scaleY = 1
 
     constructor(private scene: MainScene, bringForward: () => void, close: () => void) {
-        this.container = scene.add.container(20, (WINDOW.y - 500) / 2)
-            .setSize(300, 500).setScrollFactor(0).setDepth(GUI_DEPTH + 2).setVisible(false)
-        const cover = scene.add.rectangle(0, 0, 300, 500, 0xf6f0df)
-            .setOrigin(0).setStrokeStyle(4, 0x55483e)
-            .setInteractive().on("pointerdown", (_p: unknown, _x: unknown, _y: unknown, event: Phaser.Types.Input.EventData) => {
+        Object.assign(this.scene.game.canvas.style, {
+            position: "relative",
+            zIndex: "1"
+        })
+        this.element = document.createElement("section")
+        this.element.className = "game-handbook"
+        Object.assign(this.element.style, {
+            position: "fixed",
+            zIndex: "10000",
+            display: "none",
+            boxSizing: "border-box",
+            width: "300px",
+            height: "500px",
+            padding: "24px",
+            overflow: "hidden",
+            transformOrigin: "top left",
+            flexDirection: "column",
+            background: "#f6f0df",
+            border: "4px solid #55483e",
+            color: "#40372e",
+            fontFamily: "sans-serif"
+        })
+
+        const style = document.createElement("style")
+        style.textContent = `
+            .game-handbook { user-select:none; }
+            .game-handbook .handbook-drag-bar { height:24px;flex:none;cursor:move;background:#55483e22;touch-action:none; }
+            .game-handbook h2 { margin:12px 0;font-size:19px; }
+            .game-handbook .handbook-body { flex:1;overflow:auto;white-space:pre-wrap;font-size:15px;line-height:1.45; }
+            .game-handbook .handbook-footer { display:flex;align-items:center;justify-content:space-between;margin-top:12px; }
+            .game-handbook button { border:0;background:transparent;color:#55483e;font-size:22px;font-weight:bold;cursor:pointer; }
+            .game-handbook .handbook-close { position:absolute;top:4px;right:4px;font-size:18px; }
+        `
+        this.element.appendChild(style)
+
+        const dragBar = document.createElement("div")
+        dragBar.className = "handbook-drag-bar"
+        dragBar.addEventListener("pointerdown", event => {
+            if (event.button !== 0) return
+            event.preventDefault()
+            event.stopPropagation()
+            bringForward()
+            dragBar.setPointerCapture(event.pointerId)
+            const startX = event.clientX
+            const startY = event.clientY
+            const initialX = this.positionX
+            const initialY = this.positionY
+            const move = (moveEvent: PointerEvent) => {
+                this.positionX = Math.max(0, Math.min(
+                    WINDOW.x - 300,
+                    initialX + (moveEvent.clientX - startX) / this.scaleX
+                ))
+                this.positionY = Math.max(0, Math.min(
+                    WINDOW.y - 500,
+                    initialY + (moveEvent.clientY - startY) / this.scaleY
+                ))
+                this.applyPosition()
+            }
+            const stop = () => {
+                dragBar.removeEventListener("pointermove", move)
+                dragBar.removeEventListener("pointerup", stop)
+                dragBar.removeEventListener("pointercancel", stop)
+            }
+            dragBar.addEventListener("pointermove", move)
+            dragBar.addEventListener("pointerup", stop, { once: true })
+            dragBar.addEventListener("pointercancel", stop, { once: true })
+        })
+
+        this.title = document.createElement("h2")
+        this.body = document.createElement("div")
+        this.body.className = "handbook-body"
+        const footer = document.createElement("div")
+        footer.className = "handbook-footer"
+        this.pageNumber = document.createElement("span")
+        const makeButton = (text: string, label: string, action: () => void) => {
+            const button = document.createElement("button")
+            button.type = "button"
+            button.textContent = text
+            button.setAttribute("aria-label", label)
+            button.addEventListener("pointerdown", event => {
                 event.stopPropagation()
                 bringForward()
             })
-        this.title = scene.add.text(24, 28, "", {
-            fontSize: "19px", fontStyle: "bold", color: "#40372e", wordWrap: { width: 252 }
+            button.addEventListener("click", event => {
+                event.stopPropagation()
+                action()
+            })
+            return button
+        }
+        this.back = makeButton("\u25c0", "Previous page", () => this.turn(-1))
+        this.next = makeButton("\u25b6", "Next page", () => this.turn(1))
+        const closeButton = makeButton("X", "Close handbook", close)
+        closeButton.className = "handbook-close"
+        footer.append(this.back, this.pageNumber, this.next)
+        this.element.append(dragBar, this.title, this.body, footer, closeButton)
+        this.element.addEventListener("pointerdown", event => {
+            event.stopPropagation()
+            bringForward()
         })
-        this.body = scene.add.text(24, 76, "", {
-            fontSize: "15px", color: "#40372e", lineSpacing: 4, wordWrap: { width: 252 }
-        })
-        this.pageNumber = scene.add.text(150, 468, "", { fontSize: "13px", color: "#685a4b" }).setOrigin(0.5)
-        const button = (x: number, y: number, label: string, action: () => void) =>
-            scene.add.text(x, y, label, { fontSize: "22px", fontStyle: "bold", color: "#55483e",
-                padding: { x: 8, y: 4 } }).setOrigin(0.5).setInteractive({ useHandCursor: true })
-                .on("pointerdown", (_p: unknown, _x: unknown, _y: unknown, event: Phaser.Types.Input.EventData) => {
-                    event.stopPropagation()
-                    bringForward()
-                    action()
-                })
-        this.back = button(30, 468, "\u25c0", () => this.turn(-1))
-        this.next = button(270, 468, "\u25b6", () => this.turn(1))
-        const exit = button(278, 18, "X", close)
-        this.container.add([cover, this.title, this.body, this.pageNumber, this.back, this.next, exit])
+        for (const event of ["keydown", "keyup", "wheel"]) {
+            this.element.addEventListener(event, event => event.stopPropagation())
+        }
+        document.body.appendChild(this.element)
+        this.scene.events.once("shutdown", () => this.element.remove())
         this.render()
+        this.position()
+    }
+
+    setVisible(visible: boolean) {
+        this.element.style.display = visible ? "flex" : "none"
+        if (visible) this.position()
+    }
+
+    get isVisible() {
+        return this.element.style.display !== "none"
+    }
+
+    setAboveGame(above: boolean) {
+        this.element.style.zIndex = above ? "10000" : "0"
+    }
+
+    position() {
+        const canvas = this.scene.game.canvas.getBoundingClientRect()
+        this.scaleX = canvas.width / this.scene.scale.gameSize.width
+        this.scaleY = canvas.height / this.scene.scale.gameSize.height
+        this.applyPosition(canvas.left, canvas.top)
+    }
+
+    private applyPosition(left = this.scene.game.canvas.getBoundingClientRect().left,
+        top = this.scene.game.canvas.getBoundingClientRect().top) {
+        this.element.style.left = `${left + this.positionX * this.scaleX}px`
+        this.element.style.top = `${top + this.positionY * this.scaleY}px`
+        this.element.style.transform = `scale(${this.scaleX}, ${this.scaleY})`
     }
 
     private turn(direction: number) {
-        const next = this.page + direction
-        if (next < 0 || next >= pages.length) {
+        const nextPage = this.page + direction
+        if (nextPage < 0 || nextPage >= pages.length) {
             this.scene.cancelAction()
             return
         }
-        this.page = next
+        this.page = nextPage
         this.render()
     }
 
     private render() {
-        this.title.setText(pages[this.page].title)
-        this.body.setText(pages[this.page].body)
-        this.pageNumber.setText(`${this.page + 1} / ${pages.length}`)
-        this.back.setAlpha(this.page === 0 ? 0.3 : 1)
-        this.next.setAlpha(this.page === pages.length - 1 ? 0.3 : 1)
+        this.title.textContent = pages[this.page].title
+        this.body.textContent = pages[this.page].body
+        this.pageNumber.textContent = `${this.page + 1} / ${pages.length}`
+        this.back.style.opacity = this.page === 0 ? "0.3" : "1"
+        this.next.style.opacity = this.page === pages.length - 1 ? "0.3" : "1"
     }
 }

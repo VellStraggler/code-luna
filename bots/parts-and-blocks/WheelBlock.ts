@@ -21,13 +21,13 @@ export default class WheelBlock extends ModularBlock {
     public createChassis(dir: Dirs): void {
         let chassis = this.chassisImages[dir]
         if (!chassis) {
-            chassis = this.scene.add.image(this.globalPos.x, this.globalPos.y, WHEEL_CHASSIS_NAME)
+            chassis = this.scene.add.image(this.image.x, this.image.y, WHEEL_CHASSIS_NAME)
                 .setDepth(BLOCK_DEPTH + 50)
             this.chassisImages[dir] = chassis
             this.scene.uiCamera.ignore(chassis)
             this.scene.addWorldObject(chassis)
         }
-        chassis.setPosition(this.globalPos.x, this.globalPos.y)
+        chassis.setPosition(this.image.x, this.image.y)
             .setRotation(this.determineChassisRotation(dir))
             .setVisible(true)
         this.updateDamageTint()
@@ -61,12 +61,12 @@ export default class WheelBlock extends ModularBlock {
         }
     }
 
-    public override destroy() {
+    public override destroy(dropResources = true) {
         for (const chassis of Object.values(this.chassisImages)) {
             chassis?.destroy()
         }
         this.chassisImages = {}
-        super.destroy()
+        super.destroy(dropResources)
     }
     
     private determineChassisRotation(dir: Dirs): number {
@@ -92,10 +92,8 @@ export default class WheelBlock extends ModularBlock {
     update(animate: boolean = false) {
         super.update(animate)
 
-        let newx = this.globalPos.x
-        let newy = this.globalPos.y
         for (const chassis of Object.values(this.chassisImages)) {
-            chassis?.setPosition(newx, newy)
+            chassis?.setPosition(this.image.x, this.image.y)
         }
 
         if (this.robot != null) {

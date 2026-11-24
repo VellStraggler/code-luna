@@ -8,7 +8,6 @@ export default class BaseGameItem implements IGameItem {
     image: HPImage
     readonly id: number
     localPos: XY = xy()
-    globalPos: XY
     currentFrame: number;
     maxFrame: number;
     rotation: number;
@@ -18,7 +17,6 @@ export default class BaseGameItem implements IGameItem {
     
     constructor(
         scene: MainScene, 
-        globalPos: XY,
         image: HPImage,
         assetKey: string,
         maxFrames: number
@@ -28,7 +26,6 @@ export default class BaseGameItem implements IGameItem {
         this.scene = scene
         this.currentFrame = 0
         this.maxFrame = maxFrames
-        this.globalPos = globalPos
         this.image = image
         this.assetKey = assetKey
         
@@ -69,7 +66,7 @@ export default class BaseGameItem implements IGameItem {
     }
 
     toString() {
-        return this.assetKey + ", id: " + this.id + ", xy: " + this.globalPos
+        return this.assetKey + ", id: " + this.id + ", xy: (" + this.image.x + ", " + this.image.y + ")"
     }
 
     getFrameName() {

@@ -61,6 +61,17 @@ export const TEXT_SPACING = 20
 export const TOOLBOX_WIDTH = 40
 export const TOOLBOX_SPACING = 8
 export const TOOLBOX_OUTLINE = 3
+export const CHAT_PANEL_WIDTH = 250
+export const CHAT_PANEL_HEIGHT = 160
+export const CHAT_PANEL_HEADER_HEIGHT = 22
+export const CHAT_PANEL_COLLAPSED_HEIGHT = CHAT_PANEL_HEADER_HEIGHT
+export const CHAT_PANEL_PADDING = 6
+export const CHAT_PANEL_BOTTOM_MARGIN = CHAT_PANEL_PADDING
+export const CHAT_PANEL_VISIBLE_LINES = 7
+export const CHAT_PANEL_CHARACTERS_PER_LINE = 34
+export const CHAT_PANEL_SCROLL_LINES = 3
+export const RESOURCE_DROP_ATTRACT_RANGE_METERS = 5
+export const RESOURCE_DROP_SPEED = 70
 
 // Movement and physics
 export const GAME_SPEED = 8000 / 60

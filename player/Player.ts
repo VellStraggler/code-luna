@@ -72,6 +72,9 @@ export default class Player extends HPImage {
             return false
         } else {
             this.scene.player.playerState = newState
+            if (newState !== PlayerState.holdingNothing && newState !== PlayerState.holdingHandbook) {
+                this.scene.sound.play("equip")
+            }
             return true
         }
     }

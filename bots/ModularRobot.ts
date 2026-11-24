@@ -14,6 +14,7 @@ import WheelBlock from "./parts-and-blocks/WheelBlock";
 import GameGeometry from "../main/GameGeometry";
 import FactoryBlock, { PrintStrings } from "./parts-and-blocks/FactoryBlock";
 import PythonFunctions, { type RobotFunction } from "../main/PythonFunctions";
+import { hasMiningCapacity, proxyRelativePosition } from "../main/gameRules";
 
 /**
  * Holds larger robot data, such as the supposed source block,
@@ -41,6 +42,7 @@ export default class ModularRobot implements IGameFighter{
     public functions: RobotFunction[] | null = null
 
     private timeIdle = 0
+    private wasDriving = false
 
     goal: XY | null = null
     
@@ -127,10 +129,10 @@ export default class ModularRobot implements IGameFighter{
     }
 
     /** drop resources and remove self from robot list */
-    destroy() {
+    destroy(dropResources = true) {
         this.program?.cancel()
         for(const block of this.blocks) {
-            block.destroy()
+            block.destroy(dropResources)
         }
         this.blocks = []
         this.proxyGlobalBlock = null
@@ -526,24 +528,7 @@ export default class ModularRobot implements IGameFighter{
         }
         this.program?.update(delta)
         if (this.blocks.length === 0) return
-        let proxy = this.proxyGlobalBlock
-
-        if (proxy?.image.body) {
-            proxy.globalPos = xy(proxy.image.x, proxy.image.y)
-            this.position = proxy.globalPos.subtract(proxy.localPos)
-
-            for (const block of this.blocks) {
-                block.globalPos = this.position.add(block.localPos)
-
-                if (block !== proxy) {
-                    block.image.setPosition(block.globalPos.x, block.globalPos.y)
-                    block.image.setVelocity(
-                        proxy.image.body.velocity.x,
-                        proxy.image.body.velocity.y
-                    )
-                }
-            }
-        }
+        this.syncBlockPositions()
         if (this.lastPos.x != this.position.x || this.lastPos.y != this.position.y) {
             this.movingDirectionRadians = Phaser.Math.Angle.Between(this.lastPos.x, this.lastPos.y, this.position.x, this.position.y)
             this.hasMoved = true
@@ -557,6 +542,30 @@ export default class ModularRobot implements IGameFighter{
 
         const energyUsePerMs = this.getCalculatedEnergyUse()
         this.useEnergy((energyUsePerMs * delta) / 1000)
+    }
+
+    public syncBlockPositions() {
+        const proxy = this.proxyGlobalBlock
+        if (!proxy?.image.body) return
+
+        const proxyPosition = { x: proxy.image.x, y: proxy.image.y }
+        this.position = xy(
+            proxyPosition.x - proxy.localPos.x,
+            proxyPosition.y - proxy.localPos.y
+        )
+        for (const block of this.blocks) {
+            const position = proxyRelativePosition(proxyPosition, proxy.localPos, block.localPos)
+            if (block === proxy) continue
+
+            block.image.setPosition(position.x, position.y)
+            const body = block.image.body
+            if (body) {
+                body.updateFromGameObject()
+                body.velocity.set(proxy.image.body.velocity.x, proxy.image.body.velocity.y)
+            }
+        }
+
+        for (const block of this.blocks) block.update(false)
     }
 
     move(x:number, y: number) {
@@ -608,6 +617,8 @@ export default class ModularRobot implements IGameFighter{
             }
         }
         const driving = this.goal !== null && this.storedCosmorite > 0 && this.maxSpeed > 0
+        if (driving && !this.wasDriving) this.scene.robotMoveSound.play()
+        this.wasDriving = driving
         for (const block of this.blocks) {
             const body = block.image.body
             if (body instanceof Phaser.Physics.Arcade.Body) body.allowDrag = !driving
@@ -659,7 +670,7 @@ export default class ModularRobot implements IGameFighter{
 
     public mine(delta:number) {
         const contact = this.getTouchingDrill()
-        if (contact) {
+        if (contact && hasMiningCapacity(this.getFreeStorage())) {
             const { drill, site } = contact
             const minedAmount = Math.min((MINING_RATE_MS * delta)/1000, this.getFreeStorage(),
                 Math.max(0, this.storageSpace - this.storedLunestone - this.storedCosmorite))
@@ -711,8 +722,11 @@ export default class ModularRobot implements IGameFighter{
     /** Adds a block using an offset in this robot's local grid. */
     public addBlock(block:ModularBlock) {
         block.robot = this
-        block.globalPos = this.position.add(block.localPos)
-        block.image.setPosition(block.globalPos.x, block.globalPos.y)
+        block.image.setPosition(
+            this.position.x + block.localPos.x,
+            this.position.y + block.localPos.y
+        )
+        block.image.body?.updateFromGameObject()
         const velocity = this.proxyGlobalBlock?.image.body?.velocity
         if (velocity) block.image.setVelocity(velocity.x, velocity.y)
         for (const part of block.modularParts) {
