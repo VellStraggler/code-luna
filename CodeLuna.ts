@@ -7,7 +7,7 @@ import Player from "./player/Player"
 import PlayerBase from "./player/PlayerBase"
 import GUI from "./gui/gui"
 import HPImage from './main/HPImage'
-import { BASIC_ASSET_NAMES, WINDOW, BLOCK_RES, LASER_TEST_MS, FRAME_TIME_MS, BASE_POS, GAME_SPEED, REFINEMENT_RATE_MS, MINING_RATE_MS, GAS_MINE_RATE, STONE_MINE_RATE, COSMORITE_ORE, TWO_FRAME_ASSETS, F1, F0, BLOCK_NAMES } from './main/constants'
+import GameConstants, { BASIC_ASSET_NAMES, WINDOW, BLOCK_RES, LASER_TEST_MS, FRAME_TIME_MS, BASE_POS, GAME_SPEED, REFINEMENT_RATE_MS, MINING_RATE_MS, GAS_MINE_RATE, STONE_MINE_RATE, COSMORITE_ORE, TWO_FRAME_ASSETS, F1, F0, BLOCK_NAMES } from './main/constants'
 import IGameFighter from './bots/contracts/IGameFighter'
 import { XY, xy } from './main/XY'
 import LaserShot from './bots/LaserShot'
@@ -21,6 +21,9 @@ import RobotCache from './main/RobotCache'
 import PublicChat from './main/PublicChat'
 import ResourceDrop from './main/ResourceDrop'
 import { PLACE_SOUND_KEYS } from './main/gameRules'
+import MyColors from './main/MyColors'
+
+document.body.style.backgroundColor = MyColors.toCssHex(MyColors.black)
 
 export default class MainScene extends Phaser.Scene {
     player!: Player
@@ -74,7 +77,10 @@ export default class MainScene extends Phaser.Scene {
         let audioPre = prefix + "audio/"
         this.load.audio("laser", audioPre + "laser.mp3")
         this.load.audio("pain", audioPre + "pain.mp3")
-        this.load.audio("drilling", audioPre + "drilling.wav", {loop: true, volume: 0.5})
+        this.load.audio("drilling", audioPre + "drilling.wav", {
+            loop: true,
+            volume: GameConstants.audio.drillingVolume
+        })
         this.load.audio("weld", audioPre + "weld.mp3")
         this.load.audio("cancelled", audioPre + "cancelled.mp3")
         for (const key of PLACE_SOUND_KEYS) this.load.audio(key, audioPre + "place.mp3")
@@ -82,14 +88,17 @@ export default class MainScene extends Phaser.Scene {
     }
     
     create() {
-        this.drillSound = this.sound.add("drilling", { loop: true, volume: 0.5 })
+        this.drillSound = this.sound.add("drilling", {
+            loop: true,
+            volume: GameConstants.audio.drillingVolume
+        })
         this.walkSound = this.sound.add("walk")
         this.robotMoveSound = this.sound.add("robotMove")
         this.input.setTopOnly(true)
         /// CAMERA ///
         const camera = this.cameras.main
-        camera.setZoom(2)
-        const zoomSpeed = 0.005
+        camera.setZoom(GameConstants.game.initialCameraZoom)
+        const zoomSpeed = GameConstants.game.cameraZoomSpeed
 
         this.input.on('wheel', (
             pointer: Phaser.Input.Pointer,
@@ -100,14 +109,18 @@ export default class MainScene extends Phaser.Scene {
             if (this.GUI.isPointerOverChat(pointer.x, pointer.y)) return
 
             let newZoom = camera.zoom - deltaY * zoomSpeed
-            newZoom = Phaser.Math.Clamp(newZoom, 0.1, 3)
+            newZoom = Phaser.Math.Clamp(
+                newZoom,
+                GameConstants.game.minCameraZoom,
+                GameConstants.game.maxCameraZoom
+            )
 
             camera.setZoom(newZoom)
         })
 
         /// UI CAMERA /// : is unmoving
         this.uiCamera = this.cameras.add(0,0,WINDOW.x, WINDOW.y)
-        this.uiCamera.setZoom(1)
+        this.uiCamera.setZoom(GameConstants.game.uiCameraZoom)
         if (this.physics.world.debugGraphic != undefined)
         this.uiCamera.ignore(this.physics.world.debugGraphic) // no hitboxes double-rendered
         this.worldLayer = this.add.layer()
@@ -118,7 +131,11 @@ export default class MainScene extends Phaser.Scene {
         })
 
         /// GUI and Stats ///
-        this.mainStats = new MainStats(10,10, () => this.cancelAction())
+        this.mainStats = new MainStats(
+            GameConstants.game.initialResourceAmount,
+            GameConstants.game.initialResourceAmount,
+            () => this.cancelAction()
+        )
         this.GUI = new GUI(this, this.mainStats)
         camera.ignore(this.GUI.getUILayer())
 
@@ -135,7 +152,7 @@ export default class MainScene extends Phaser.Scene {
             this.controls.onNonButtonClick(pointer)
         })
         
-        this.createOre(500, 300)
+        this.createOre(GameConstants.game.initialOreX, GameConstants.game.initialOreY)
         this.robotCache = new RobotCache(this, () => this.GUI.showSaveWarning())
         if (!this.robotCache.load()) this.robots.debug_createRobot()
         const saveRobots = () => this.robotCache.save()
@@ -211,7 +228,12 @@ export default class MainScene extends Phaser.Scene {
     }
 
     createPlayer() {
-        this.player = new Player(this, 400, 350, 'player/down-f0')
+        this.player = new Player(
+            this,
+            GameConstants.game.initialPlayerX,
+            GameConstants.game.initialPlayerY,
+            'player/down-f0'
+        )
     }
 
     createBase(x:number, y:number) {
@@ -282,7 +304,7 @@ export default class MainScene extends Phaser.Scene {
         }
         this.robots.connectWeldingBlocks()
         this.robots.connectFreshBlocks()
-        if (_time - this.lastRobotSave >= 1000) {
+        if (_time - this.lastRobotSave >= GameConstants.game.robotSaveIntervalMs) {
             this.lastRobotSave = _time
             this.robotCache.save()
         }
@@ -403,7 +425,7 @@ const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
     width: WINDOW.x,
     height: WINDOW.y,
-    backgroundColor: '#444444',
+    backgroundColor: MyColors.gameBackground,
     fps: {
         target: 60,
         forceSetTimeOut: true

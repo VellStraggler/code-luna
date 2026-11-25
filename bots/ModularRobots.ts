@@ -36,8 +36,11 @@ export default class ModularRobots {
         scene.physics.world.on(Phaser.Physics.Arcade.Events.WORLD_STEP, () => {
             this.offloadedThisStep.clear()
         })
-        const syncPositions = () => {
-            for (const robot of this.robots) robot.syncBlockPositions()
+        const syncPositions = (_time: number, delta: number) => {
+            for (const robot of this.robots) {
+                robot.updateMovementIdle(delta)
+                robot.syncBlockPositions()
+            }
         }
         scene.events.on(Phaser.Scenes.Events.POST_UPDATE, syncPositions)
         scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () =>

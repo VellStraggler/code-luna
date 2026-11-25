@@ -1,6 +1,7 @@
 import type ModularRobot from "../bots/ModularRobot"
 import type MainScene from "../CodeLuna"
 import { xy } from "./XY"
+import GameConstants from "./constants"
 
 export type FunctionDefinition = { name: string, body: string }
 export type RobotFunction = FunctionDefinition & { expanded: boolean, error?: string }
@@ -23,10 +24,6 @@ type Step = { wait: number } | null
 type Execution = Generator<Step, Value, void>
 type Command = (...args: Value[]) => Value
 
-const MAX_SOURCE_LENGTH = 20000
-const MAX_STEPS = 100000
-const STEPS_PER_UPDATE = 500
-const MAX_CALL_DEPTH = 32
 const COMMAND_ARITY: Record<string, [number, number]> = {
     canMove: [0, 0], canMine: [0, 0], hasCpu: [0, 0], hasDrill: [0, 0],
     getLunestone: [0, 0], getCosmorite: [0, 0], getFreeStorage: [0, 0], getMeterRange: [0, 0],
@@ -46,16 +43,20 @@ class ExpressionParser {
             if (!source.slice(pos).trim()) break
             token.lastIndex = pos
             const match = token.exec(source)
-            if (!match) throw new Error(`Unexpected character: ${source[pos]}`)
+            if (!match) throw new Error(GameConstants.errors.unexpectedCharacter(source[pos]))
             this.tokens.push(match[1] ?? match[2] ?? match[3] ?? match[4])
-            if (this.tokens.length > 512) throw new Error("Expression is too long")
+            if (this.tokens.length > GameConstants.robotProgram.maxExpressionTokens) {
+                throw new Error(GameConstants.errors.expressionTooLong)
+            }
             pos = token.lastIndex
         }
     }
 
     parse(): Expr {
         const result = this.binary(0)
-        if (this.index !== this.tokens.length) throw new Error(`Unexpected token: ${this.tokens[this.index]}`)
+        if (this.index !== this.tokens.length) {
+            throw new Error(GameConstants.errors.unexpectedToken(this.tokens[this.index]))
+        }
         return result
     }
 
@@ -88,7 +89,7 @@ class ExpressionParser {
             this.expect(")")
             return expression
         }
-        if (!token) throw new Error("Expected an expression")
+        if (!token) throw new Error(GameConstants.errors.expectedExpression)
         if (/^(?:\d|\.)/.test(token)) return { kind: "value", value: Number(token) }
         if (token[0] === '"' || token[0] === "'") {
             const value = token.slice(1, -1).replace(/\\(.)/g, (_match, char: string) =>
@@ -98,7 +99,7 @@ class ExpressionParser {
         if (token === "True" || token === "False" || token === "None") {
             return { kind: "value", value: token === "None" ? null : token === "True" }
         }
-        if (!/^[A-Za-z_]\w*$/.test(token)) throw new Error(`Unexpected token: ${token}`)
+        if (!/^[A-Za-z_]\w*$/.test(token)) throw new Error(GameConstants.errors.unexpectedToken(token))
         if (this.tokens[this.index] !== "(") return { kind: "name", name: token }
         this.index++
         const args: Expr[] = []
@@ -114,34 +115,42 @@ class ExpressionParser {
     }
 
     private expect(token: string) {
-        if (this.tokens[this.index++] !== token) throw new Error(`Expected '${token}'`)
+        if (this.tokens[this.index++] !== token) throw new Error(GameConstants.errors.expectedToken(token))
     }
 }
 
 function parseBody(source: string): Statement[] {
-    if (source.length > MAX_SOURCE_LENGTH) throw new Error("Function body is too long")
+    if (source.length > GameConstants.robotProgram.maxSourceLength) {
+        throw new Error(GameConstants.errors.functionBodyTooLong)
+    }
     const lines = source.replace(/\r\n?/g, "\n").split("\n")
         .map((text, index) => ({ text, number: index + 1 }))
         .filter(line => line.text.trim() && !line.text.trimStart().startsWith("#"))
     let index = 0
     const parseBlock = (indent: number, depth: number): Statement[] => {
-        if (depth > 32) throw new Error("Too many nested blocks")
+        if (depth > GameConstants.robotProgram.maxNestingDepth) {
+            throw new Error(GameConstants.errors.tooManyNestedBlocks)
+        }
         const statements: Statement[] = []
         while (index < lines.length) {
             const line = lines[index]
             const prefix = line.text.match(/^\s*/)?.[0] ?? ""
-            if (prefix.includes("\t")) throw new Error(`Line ${line.number}: Use spaces for indentation`)
+            if (prefix.includes("\t")) {
+                throw new Error(GameConstants.errors.lineError(line.number, GameConstants.errors.useSpacesForIndentation))
+            }
             if (prefix.length < indent) break
-            if (prefix.length > indent) throw new Error(`Line ${line.number}: Unexpected indentation`)
+            if (prefix.length > indent) {
+                throw new Error(GameConstants.errors.lineError(line.number, GameConstants.errors.unexpectedIndentation))
+            }
             const text = line.text.trim()
             if (text === "else:") break
             index++
             try {
                 const block = text.match(/^(if|while)\s+(.+):$/)
                 if (block) {
-                    if (index >= lines.length) throw new Error("Expected an indented block")
+                    if (index >= lines.length) throw new Error(GameConstants.errors.expectedIndentedBlock)
                     const nextIndent = lines[index].text.match(/^ */)![0].length
-                    if (nextIndent <= indent) throw new Error("Expected an indented block")
+                    if (nextIndent <= indent) throw new Error(GameConstants.errors.expectedIndentedBlock)
                     const body = parseBlock(nextIndent, depth + 1)
                     if (block[1] === "while") {
                         statements.push({ kind: "while", condition: new ExpressionParser(block[2]).parse(), body, line: line.number })
@@ -149,9 +158,9 @@ function parseBody(source: string): Statement[] {
                         let otherwise: Statement[] = []
                         if (index < lines.length && lines[index].text === " ".repeat(indent) + "else:") {
                             index++
-                            if (index >= lines.length) throw new Error("Expected an indented block after else")
+                            if (index >= lines.length) throw new Error(GameConstants.errors.expectedBlockAfterElse)
                             const elseIndent = lines[index].text.match(/^ */)![0].length
-                            if (elseIndent <= indent) throw new Error("Expected an indented block after else")
+                            if (elseIndent <= indent) throw new Error(GameConstants.errors.expectedBlockAfterElse)
                             otherwise = parseBlock(elseIndent, depth + 1)
                         }
                         statements.push({ kind: "if", condition: new ExpressionParser(block[2]).parse(), body, otherwise, line: line.number })
@@ -165,13 +174,21 @@ function parseBody(source: string): Statement[] {
                         : { kind: "expression", expression: new ExpressionParser(text).parse(), line: line.number })
                 }
             } catch (error) {
-                throw new Error(`Line ${line.number}: ${error instanceof Error ? error.message : String(error)}`)
+                throw new Error(GameConstants.errors.lineError(
+                    line.number,
+                    error instanceof Error ? error.message : String(error)
+                ))
             }
         }
         return statements
     }
     const result = parseBlock(0, 0)
-    if (index < lines.length) throw new Error(`Line ${lines[index].number}: Unexpected else`)
+    if (index < lines.length) {
+        throw new Error(GameConstants.errors.lineError(
+            lines[index].number,
+            GameConstants.errors.unexpectedElse
+        ))
+    }
     return result
 }
 
@@ -184,8 +201,13 @@ export default class PythonFunctions {
 
     constructor(private scene: MainScene, private robot: ModularRobot) {
         const number = (value: Value, name: string) => {
-            if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`${name} requires finite numbers`)
+            if (typeof value !== "number" || !Number.isFinite(value)) {
+                throw new Error(GameConstants.errors.namedRequiresNumbers(name))
+            }
             return value
+        }
+        const requireDishForChat = () => {
+            if (!robot.hasDish()) throw new Error(GameConstants.errors.robotChatRequiresDish)
         }
         this.commands = {
             canMove: () => robot.canMove(),
@@ -196,12 +218,17 @@ export default class PythonFunctions {
             getCosmorite: () => robot.storedCosmorite,
             getFreeStorage: () => robot.getFreeStorage(),
             getMeterRange: () => robot.getMeterRange(),
-            print: value => { scene.chat.print(String(value)); return null },
-            getChatText: index => index === undefined ? scene.chat.getText() : scene.chat.getText(number(index, "getChatText")),
+            print: value => { requireDishForChat(); scene.chat.print(String(value)); return null },
+            getChatText: index => {
+                requireDishForChat()
+                return index === undefined ? scene.chat.getText() : scene.chat.getText(number(index, "getChatText"))
+            },
             move: (x, y) => { robot.move(number(x, "move"), number(y, "move")); return null },
             aim: (x, y) => { robot.aim(xy(number(x, "aim"), number(y, "aim"))); return null },
             selectBlock: (name) => {
-                if (typeof name !== "string") throw new Error("selectBlock requires a block name")
+                if (typeof name !== "string") {
+                    throw new Error(GameConstants.errors.namedRequiresBlockName("selectBlock"))
+                }
                 robot.selectBlock(name); return null
             },
             place: (x, y, index = 0) => robot.place(number(x, "place"), number(y, "place"), number(index, "place")),
@@ -218,16 +245,18 @@ export default class PythonFunctions {
             if (!/^[A-Za-z_]\w*$/.test(definition.name) ||
                 ["True", "False", "None", "if", "else", "while", "return", "and", "or", "not", "wait"].includes(definition.name) ||
                 Object.hasOwn(this.commands, definition.name)) {
-                throw new Error(`Invalid or reserved function name: ${definition.name}`)
+                throw new Error(GameConstants.errors.invalidFunctionName(definition.name))
             }
-            if (functions.has(definition.name)) throw new Error(`Duplicate function: ${definition.name}`)
+            if (functions.has(definition.name)) {
+                throw new Error(GameConstants.errors.duplicateFunction(definition.name))
+            }
             try {
                 functions.set(definition.name, parseBody(definition.body))
             } catch (error) {
                 throw new Error(`${definition.name}: ${error instanceof Error ? error.message : String(error)}`)
             }
         }
-        if (!functions.has(name)) throw new Error(`Unknown function: ${name}`)
+        if (!functions.has(name)) throw new Error(GameConstants.errors.unknownFunction(name))
         this.cancel()
         this.execution = this.callUser(functions, name, [], 0)
         this.onError = onError
@@ -247,8 +276,10 @@ export default class PythonFunctions {
             if (this.remainingWait > 0) return
         }
         try {
-            for (let i = 0; i < STEPS_PER_UPDATE && this.execution; i++) {
-                if (++this.steps > MAX_STEPS) throw new Error("Instruction limit exceeded")
+            for (let i = 0; i < GameConstants.robotProgram.stepsPerUpdate && this.execution; i++) {
+                if (++this.steps > GameConstants.robotProgram.maxSteps) {
+                    throw new Error(GameConstants.errors.instructionLimit)
+                }
                 const result = this.execution.next()
                 if (result.done) { this.cancel(); return }
                 if (result.value?.wait) { this.remainingWait = result.value.wait; return }
@@ -261,10 +292,12 @@ export default class PythonFunctions {
     }
 
     private *callUser(functions: Map<string, Statement[]>, name: string, args: Value[], depth: number): Execution {
-        if (depth >= MAX_CALL_DEPTH) throw new Error("Function call depth exceeded")
+        if (depth >= GameConstants.robotProgram.maxCallDepth) {
+            throw new Error(GameConstants.errors.callDepthLimit)
+        }
         const body = functions.get(name)
-        if (!body) throw new Error(`Unknown function: ${name}`)
-        if (args.length) throw new Error(`${name} takes no arguments`)
+        if (!body) throw new Error(GameConstants.errors.unknownFunction(name))
+        if (args.length) throw new Error(GameConstants.errors.functionArgumentCount(name))
         try {
             const result = yield* this.executeBlock(functions, body, new Map(), depth)
             return result.returned ? result.value : null
@@ -291,7 +324,10 @@ export default class PythonFunctions {
                     }
                 }
             } catch (error) {
-                throw new Error(`Line ${statement.line}: ${error instanceof Error ? error.message : String(error)}`)
+                throw new Error(GameConstants.errors.lineError(
+                    statement.line,
+                    error instanceof Error ? error.message : String(error)
+                ))
             }
         }
         return { returned: false, value: null }
@@ -301,7 +337,9 @@ export default class PythonFunctions {
         yield null
         if (expression.kind === "value") return expression.value
         if (expression.kind === "name") {
-            if (!variables.has(expression.name)) throw new Error(`Unknown variable: ${expression.name}`)
+            if (!variables.has(expression.name)) {
+                throw new Error(GameConstants.errors.unknownVariable(expression.name))
+            }
             return variables.get(expression.name)!
         }
         if (expression.kind === "call") {
@@ -310,7 +348,7 @@ export default class PythonFunctions {
             if (expression.name === "wait") {
                 if (args.length !== 1 || typeof args[0] !== "number" ||
                     !Number.isFinite(args[0] * 1000) || args[0] < 0) {
-                    throw new Error("wait requires a non-negative number of seconds")
+                    throw new Error(GameConstants.errors.waitSeconds)
                 }
                 yield { wait: args[0] * 1000 }
                 return null
@@ -318,7 +356,8 @@ export default class PythonFunctions {
             if (Object.hasOwn(this.commands, expression.name)) {
                 const [min, max] = COMMAND_ARITY[expression.name]
                 if (args.length < min || args.length > max) {
-                    throw new Error(`${expression.name} expects ${min === max ? min : `${min} to ${max}`} arguments`)
+                    const count = min === max ? String(min) : `${min} to ${max}`
+                    throw new Error(GameConstants.errors.commandArgumentCount(expression.name, count))
                 }
                 return this.commands[expression.name](...args)
             }
@@ -327,7 +366,7 @@ export default class PythonFunctions {
         if (expression.kind === "unary") {
             const value = yield* this.evaluate(functions, expression.value, variables, depth)
             if (expression.op === "not") return !value
-            if (typeof value !== "number") throw new Error("Unary arithmetic requires a number")
+            if (typeof value !== "number") throw new Error(GameConstants.errors.unaryNumber)
             return expression.op === "-" ? -value : value
         }
         const left = yield* this.evaluate(functions, expression.left, variables, depth)
@@ -339,7 +378,9 @@ export default class PythonFunctions {
             case "==": return left === right
             case "!=": return left !== right
         }
-        if (typeof left !== "number" || typeof right !== "number") throw new Error(`${expression.op} requires numbers`)
+        if (typeof left !== "number" || typeof right !== "number") {
+            throw new Error(GameConstants.errors.operatorRequiresNumbers(expression.op))
+        }
         switch (expression.op) {
             case "+": return left + right
             case "-": return left - right
@@ -351,6 +392,6 @@ export default class PythonFunctions {
             case ">": return left > right
             case ">=": return left >= right
         }
-        throw new Error("Division by zero")
+        throw new Error(GameConstants.errors.divisionByZero)
     }
 }

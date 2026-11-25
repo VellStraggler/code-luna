@@ -2,27 +2,49 @@ import MainScene from "../CodeLuna"
 import { BlockDefinition } from "../bots/parts-and-blocks/BlockDefinition"
 import FactoryBlock from "../bots/parts-and-blocks/FactoryBlock"
 import { PartDefinition } from "../bots/parts-and-blocks/PartDefinition"
-import { Dirs, F0, FACTORY_GUI_PADDING, GUI_SIZE, TEXT_SPACING, TOOLBOX_SPACING, TOOLBOX_WIDTH } from "../main/constants"
+import GameConstants, { Dirs, F0, FACTORY_GUI_PADDING } from "../main/constants"
 import MyColors from "../main/MyColors"
 
 export default class FactoryGUI {
-    readonly container: Phaser.GameObjects.Container
+    readonly element: HTMLDivElement
     isVisible = false
     private factory: FactoryBlock | null = null
-    private blockButtons = new Map<BlockDefinition, Phaser.GameObjects.Rectangle>()
-    private partButtons = new Map<PartDefinition, Phaser.GameObjects.Rectangle>()
-    private directionButtons = new Map<Dirs, {
-        button: Phaser.GameObjects.Rectangle
-        triangle: Phaser.GameObjects.Text
-        cross: Phaser.GameObjects.Graphics
-    }>()
-    private resourceButtons = new Map<boolean, Phaser.GameObjects.Rectangle>()
-    private partLabel: Phaser.GameObjects.Text
-    private status: Phaser.GameObjects.Text
+    private readonly blockButtons = new Map<BlockDefinition, HTMLButtonElement>()
+    private readonly partButtons = new Map<PartDefinition, HTMLButtonElement>()
+    private readonly directionButtons = new Map<Dirs, HTMLButtonElement>()
+    private readonly resourceButtons = new Map<boolean, HTMLButtonElement>()
+    private readonly partLabel: HTMLDivElement
+    private readonly status: HTMLDivElement
     private statusMessage = ""
 
-    constructor(private scene: MainScene) {
-        this.container = scene.add.container(0, 0).setVisible(false)
+    constructor(private scene: MainScene, parent: HTMLElement) {
+        this.element = document.createElement("div")
+        this.element.className = "factory-monitor"
+        Object.assign(this.element.style, {
+            position: "absolute",
+            inset: "0",
+            display: "none",
+            boxSizing: "border-box",
+            padding: `${FACTORY_GUI_PADDING}px`,
+            color: MyColors.toCssHex(MyColors.white),
+            font: `${GameConstants.ui.compactFontSize}px monospace`
+        })
+        const style = document.createElement("style")
+        style.textContent = `
+            .factory-monitor { display:flex;flex-direction:column;gap:6px; }
+            .factory-monitor button { border:1px solid ${MyColors.toCssHex(MyColors.white)};background:transparent;color:inherit;font:inherit;cursor:pointer; }
+            .factory-monitor button.selected { outline:2px solid ${MyColors.toCssHex(MyColors.white)}; }
+            .factory-monitor .factory-scroll { display:flex;gap:4px;overflow:auto;min-height:44px; }
+            .factory-monitor .factory-icon { flex:0 0 40px;width:40px;height:40px;padding:2px; }
+            .factory-monitor .factory-icon img { width:100%;height:100%;object-fit:contain;image-rendering:pixelated; }
+            .factory-monitor .factory-direction { position:absolute;width:26px;height:26px; }
+            .factory-monitor .factory-status { min-height:20px;white-space:pre-wrap; }
+            .factory-monitor .factory-bottom { display:flex;align-items:center;gap:4px;margin-top:auto; }
+            .factory-monitor .factory-bottom button { min-height:24px;padding:2px 6px; }
+            .factory-monitor .factory-print { width:40px;height:40px;margin-left:auto; }
+        `
+        this.element.append(style)
+
         const blocks = Object.values(BlockDefinition).filter((value): value is BlockDefinition =>
             value instanceof BlockDefinition && value !== BlockDefinition.unknown &&
             scene.textures.exists(this.iconKey(value))
@@ -31,52 +53,57 @@ export default class FactoryGUI {
             value instanceof PartDefinition && value !== PartDefinition.unknown &&
             scene.textures.exists(this.iconKey(value))
         )
-        const padding = FACTORY_GUI_PADDING
-        const contentWidth = GUI_SIZE.x - padding * 2
-        const spacing = TOOLBOX_WIDTH + TOOLBOX_SPACING
-        const columns = Math.max(1, Math.floor((contentWidth + TOOLBOX_SPACING) / spacing))
-        this.text(padding, padding, "Block type")
-        blocks.forEach((definition, index) => {
-            const x = padding + TOOLBOX_WIDTH / 2 + (index % columns) * spacing
-            const y = padding + TEXT_SPACING + TOOLBOX_WIDTH / 2 + Math.floor(index / columns) * spacing
-            this.blockButtons.set(definition, this.iconButton(x, y, definition, () => {
+        const blockLabel = document.createElement("div")
+        blockLabel.textContent = GameConstants.text.factoryBlockType
+        const blockList = document.createElement("div")
+        blockList.className = "factory-scroll"
+        blocks.forEach(definition => {
+            const button = this.iconButton(definition, () => {
                 if (!this.factory) return
                 this.factory.selectedBlock = definition
                 this.statusMessage = ""
                 this.update()
-            }))
+            })
+            this.blockButtons.set(definition, button)
+            blockList.append(button)
         })
-        const partsY = padding + TEXT_SPACING + Math.ceil(blocks.length / columns) * spacing
-        this.partLabel = this.text(padding, partsY, "Parts")
-        const resetX = GUI_SIZE.x - padding - 36
-        this.button(resetX, partsY + 9, 72, 20, () => {
+        this.partLabel = document.createElement("div")
+        const partHeader = document.createElement("div")
+        partHeader.style.display = "flex"
+        partHeader.style.justifyContent = "space-between"
+        partHeader.append(this.partLabel, this.button(GameConstants.text.factoryReset, () => {
             this.factory?.selectedParts.clear()
             this.statusMessage = ""
             this.update()
-        })
-        this.text(resetX, partsY + 9, "Reset", 12).setOrigin(0.5)
-        parts.forEach((definition, index) => {
-            const x = padding + TOOLBOX_WIDTH / 2 + (index % columns) * spacing
-            const y = partsY + TEXT_SPACING + TOOLBOX_WIDTH / 2 + Math.floor(index / columns) * spacing
-            this.partButtons.set(definition, this.iconButton(x, y, definition, () => {
+        }))
+        const partList = document.createElement("div")
+        partList.className = "factory-scroll"
+        parts.forEach(definition => {
+            const button = this.iconButton(definition, () => {
                 if (!this.factory) return
-                if (this.factory.selectedParts.has(definition)) {
-                    this.factory.selectedParts.delete(definition)
-                } else {
-                    this.factory.selectedParts.add(definition)
-                }
+                if (this.factory.selectedParts.has(definition)) this.factory.selectedParts.delete(definition)
+                else this.factory.selectedParts.add(definition)
                 this.statusMessage = ""
                 this.update()
-            }))
+            })
+            this.partButtons.set(definition, button)
+            partList.append(button)
         })
-        const directions: [Dirs, number, number, string][] = [
-            [Dirs.up, GUI_SIZE.x / 2, padding / 2, "\u25B2"],
-            [Dirs.down, GUI_SIZE.x / 2, GUI_SIZE.y - padding / 2, "\u25BC"],
-            [Dirs.left, padding / 2, GUI_SIZE.y / 2, "\u25C0"],
-            [Dirs.right, GUI_SIZE.x - padding / 2, GUI_SIZE.y / 2, "\u25B6"]
-        ]
-        for (const [direction, x, y, triangle] of directions) {
-            const button = this.button(x, y, 24, 24, () => {
+
+        const directionGlyphs: Record<Dirs, string> = {
+            [Dirs.up]: "\u25B2",
+            [Dirs.down]: "\u25BC",
+            [Dirs.left]: "\u25C0",
+            [Dirs.right]: "\u25B6"
+        }
+        const directionPositions: Record<Dirs, [string, string]> = {
+            [Dirs.up]: ["50%", "0"],
+            [Dirs.down]: ["50%", "auto"],
+            [Dirs.left]: ["0", "50%"],
+            [Dirs.right]: ["auto", "50%"]
+        }
+        for (const direction of Object.values(Dirs)) {
+            const button = this.button(directionGlyphs[direction], () => {
                 if (!this.factory || this.factory.isOutputBlocked(direction)) {
                     this.scene.cancelAction()
                     return
@@ -85,76 +112,81 @@ export default class FactoryGUI {
                 this.statusMessage = ""
                 this.update()
             })
-            const triangleText = this.text(x, y, triangle, 18).setOrigin(0.5)
-            const cross = scene.add.graphics().setPosition(x, y).setVisible(false)
-            cross.lineStyle(2, MyColors.red)
-                .lineBetween(-9, -9, 9, 9)
-                .lineBetween(-9, 9, 9, -9)
-            this.container.add(cross)
-            this.directionButtons.set(direction, { button, triangle: triangleText, cross })
+            button.className = "factory-direction"
+            const [left, top] = directionPositions[direction]
+            button.style.left = left
+            button.style.top = top
+            if (direction === Dirs.up || direction === Dirs.down) button.style.transform = "translateX(-50%)"
+            if (direction === Dirs.down) button.style.bottom = "0"
+            if (direction === Dirs.right) button.style.right = "0"
+            this.directionButtons.set(direction, button)
+            this.element.append(button)
         }
-        this.status = this.text(padding, GUI_SIZE.y - padding - TOOLBOX_WIDTH - TEXT_SPACING * 2, "", 12)
-            .setWordWrapWidth(contentWidth)
-        const bottomY = GUI_SIZE.y - TOOLBOX_WIDTH / 2 - padding
-        const resourceLabel = this.text(0, bottomY, "get resources", 12).setOrigin(0, 0.5)
-        const resourceWidth = 80
-        const groupWidth = resourceLabel.width + 8 + resourceWidth * 2 + 4
-        const groupX = (GUI_SIZE.x - groupWidth) / 2
-        resourceLabel.setX(groupX)
-        for (const [index, fromUser] of [true, false].entries()) {
-            const x = groupX + resourceLabel.width + 8 + resourceWidth / 2 + index * (resourceWidth + 4)
-            this.resourceButtons.set(fromUser, this.button(x, bottomY, resourceWidth, 24, () => {
+
+        this.status = document.createElement("div")
+        this.status.className = "factory-status"
+        const bottom = document.createElement("div")
+        bottom.className = "factory-bottom"
+        const resourceLabel = document.createElement("span")
+        resourceLabel.textContent = GameConstants.text.factoryResources
+        bottom.append(resourceLabel)
+        for (const [fromUser, label] of [
+            [true, GameConstants.text.factoryFromUser],
+            [false, GameConstants.text.factoryFromBot]
+        ] as const) {
+            const button = this.button(label, () => {
                 if (!this.factory) return
                 this.factory.fromUser = fromUser
                 this.statusMessage = ""
                 this.update()
-            }))
-            this.text(x, bottomY, fromUser ? "from user" : "from bot", 12).setOrigin(0.5)
+            })
+            this.resourceButtons.set(fromUser, button)
+            bottom.append(button)
         }
-        const printX = GUI_SIZE.x - TOOLBOX_WIDTH / 2 - padding
-        this.button(printX, bottomY, TOOLBOX_WIDTH, TOOLBOX_WIDTH, () => {
+        bottom.append(this.button(GameConstants.text.factoryPrint, () => {
             if (!this.factory) return
             this.statusMessage = this.factory.print()
             this.update()
-        })
-        const printIcon = scene.add.graphics().setPosition(printX, bottomY)
-        printIcon.lineStyle(2, MyColors.white)
-            .strokeRect(-12, -6, 24, 15)
-            .strokeRect(-8, -14, 16, 8)
-            .fillStyle(MyColors.white)
-            .fillRect(-8, 3, 16, 11)
-            .fillStyle(MyColors.green)
-            .fillRect(-5, 6, 10, 1)
-            .fillRect(-5, 9, 10, 1)
-        this.container.add(printIcon)
+        }, "factory-print"))
+        this.element.append(blockLabel, blockList, partHeader, partList, this.status, bottom)
+        parent.append(this.element)
+        this.scene.events.once("shutdown", () => this.element.remove())
     }
 
     private iconKey(definition: BlockDefinition | PartDefinition) {
         return definition.assetKey + (definition.availableFrames > 1 ? F0 : "")
     }
 
-    private text(x: number, y: number, message: string, size = 14) {
-        const text = this.scene.add.text(x, y, message, { fontSize: `${size}px`, color: "#ffffff" })
-        this.container.add(text)
-        return text
+    private iconUrl(definition: BlockDefinition | PartDefinition) {
+        const key = this.iconKey(definition)
+        const asset = definition instanceof BlockDefinition && !key.startsWith("block/")
+            ? `block/${key}`
+            : key
+        return `${import.meta.env.BASE_URL}assets/${asset}.png`
     }
 
-    private button(x: number, y: number, width: number, height: number, action: () => void) {
-        const button = this.scene.add.rectangle(x, y, width, height, MyColors.white, 0.12)
-            .setInteractive({ useHandCursor: true })
-            .on("pointerdown", (
-                _pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData
-            ) => {
-                event.stopPropagation()
-                action()
-            })
-        this.container.add(button)
+    private button(label: string, action: () => void, className = "") {
+        const button = document.createElement("button")
+        button.type = "button"
+        button.className = className
+        button.textContent = label
+        button.addEventListener("pointerdown", event => {
+            event.preventDefault()
+            event.stopPropagation()
+        })
+        button.addEventListener("click", event => {
+            event.stopPropagation()
+            action()
+        })
         return button
     }
 
-    private iconButton(x: number, y: number, definition: BlockDefinition | PartDefinition, action: () => void) {
-        const button = this.button(x, y, TOOLBOX_WIDTH, TOOLBOX_WIDTH, action)
-        this.container.add(this.scene.add.image(x, y, this.iconKey(definition)).setScale(2))
+    private iconButton(definition: BlockDefinition | PartDefinition, action: () => void) {
+        const button = this.button("", action, "factory-icon")
+        const image = document.createElement("img")
+        image.src = this.iconUrl(definition)
+        image.alt = definition.assetKey
+        button.append(image)
         return button
     }
 
@@ -167,7 +199,7 @@ export default class FactoryGUI {
 
     setVisible(visible: boolean) {
         this.isVisible = visible
-        this.container.setVisible(visible)
+        this.element.style.display = visible ? "flex" : "none"
         if (visible) this.update()
     }
 
@@ -175,24 +207,30 @@ export default class FactoryGUI {
         const factory = this.factory
         if (!factory) return
         for (const [definition, button] of this.blockButtons) {
-            button.setStrokeStyle(factory.selectedBlock === definition ? 2 : 0, MyColors.white)
+            button.classList.toggle("selected", factory.selectedBlock === definition)
         }
         for (const [definition, button] of this.partButtons) {
-            button.setStrokeStyle(factory.selectedParts.has(definition) ? 2 : 0, MyColors.white)
+            button.classList.toggle("selected", factory.selectedParts.has(definition))
         }
-        for (const [direction, { button, triangle, cross }] of this.directionButtons) {
+        for (const [direction, button] of this.directionButtons) {
             const blocked = factory.isOutputBlocked(direction)
-            button.setStrokeStyle(factory.outputDirection === direction ? 2 : 0, MyColors.white)
-                .setAlpha(blocked ? 0.35 : 1)
-            triangle.setAlpha(blocked ? 0.35 : 1)
-            cross.setVisible(blocked)
+            button.classList.toggle("selected", factory.outputDirection === direction)
+            button.style.opacity = blocked ? "0.35" : "1"
+            button.textContent = blocked ? "\u2715" : ({
+                [Dirs.up]: "\u25B2",
+                [Dirs.down]: "\u25BC",
+                [Dirs.left]: "\u25C0",
+                [Dirs.right]: "\u25B6"
+            } as Record<Dirs, string>)[direction]
         }
         for (const [fromUser, button] of this.resourceButtons) {
-            button.setFillStyle(MyColors.white, 0)
-                .setStrokeStyle(factory.fromUser === fromUser ? 2 : 0, MyColors.white)
+            button.classList.toggle("selected", factory.fromUser === fromUser)
         }
-        this.partLabel.setText(`Parts (${factory.selectedParts.size} / ${factory.selectedBlock.partLimit})`)
+        this.partLabel.textContent =
+            `${GameConstants.text.factoryParts} (${factory.selectedParts.size} / ${factory.selectedBlock.partLimit})`
         const cost = factory.getPrintCost()
-        this.status.setText(this.statusMessage || `Cost: ${cost.gas.toFixed(1)} gas / ${cost.stone.toFixed(1)} stone`)
+        this.status.textContent = this.statusMessage ||
+            `${GameConstants.text.factoryCost} ${cost.gas.toFixed(GameConstants.toolbar.statPrecision)} ${GameConstants.text.gasUnit} / ` +
+            `${cost.stone.toFixed(GameConstants.toolbar.statPrecision)} ${GameConstants.text.stoneUnit}`
     }
 }

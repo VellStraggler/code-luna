@@ -1,6 +1,6 @@
 import CpuPart from "../bots/parts-and-blocks/CpuPart";
 import MainScene from "../CodeLuna";
-import { BLOCK_DEPTH } from "../main/constants";
+import GameConstants, { BLOCK_DEPTH } from "../main/constants";
 import HPImage from "../main/HPImage";
 
 export default class Player extends HPImage {
@@ -11,9 +11,9 @@ export default class Player extends HPImage {
         super(scene, x, y, texture)
         this.updateShadowTexture()
         this.updateShadow()
-        this.setScale(0.75)
-            .setSize(9,12)
-            .setDrag(700)
+        this.setScale(GameConstants.player.scale)
+            .setSize(GameConstants.player.bodyWidth, GameConstants.player.bodyHeight)
+            .setDrag(GameConstants.player.drag)
             .setDepth(BLOCK_DEPTH)
 
         scene.cameras.main.startFollow(this)
@@ -37,8 +37,8 @@ export default class Player extends HPImage {
         const frame = this.frame
         const width = frame.cutWidth
         const height = frame.cutHeight
-        const shear = 0.3
-        const squash = 0.85
+        const shear = GameConstants.player.shadowShear
+        const squash = GameConstants.player.shadowSquash
         const canvasWidth = Math.ceil(width + height * shear)
 
         if (!this.scene.textures.exists(key)) {

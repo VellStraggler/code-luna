@@ -1,20 +1,23 @@
 import MainScene from "../CodeLuna";
-import { TEXT_SPACING, TOOLBOX_SPACING, TOOLBOX_WIDTH } from "../main/constants";
+import GameConstants, { TEXT_SPACING, TOOLBOX_SPACING, TOOLBOX_WIDTH } from "../main/constants";
 import GameGeometry from "../main/GameGeometry";
 import { PlayerState } from "../player/Player";
+import UIComponent, { type UIObject } from "./UIComponent"
 import UIStatLine, { UIFormattedStatLine, UIIconButton, UIIconStatLine, UIStatButtonLine, UITextButtonLine, UITextLine } from "./StatMessage";
+import UITextRow from "./UITextRow"
 
-export default class UIColumn {
+export default class UIColumn implements UIComponent {
     private scene: MainScene
     public list: UITextLine[] = []
+    private components: UIComponent[] = []
     public iconButtons: UIIconButton[] = []
-    public readonly x: number
-    public readonly y: number
+    public x: number
+    public y: number
     public latestY: number
     public isVisible: boolean
     public backgroundRect: Phaser.GameObjects.Rectangle | null
     public readonly align: string
-    private fontSize = 16
+    private fontSize = GameConstants.ui.defaultFontSize
     private maxTextWidth = Infinity
 
     constructor(
@@ -46,7 +49,15 @@ export default class UIColumn {
         }
     }
 
-    public addIconStatLine(phaserName: string, msg: string, getVariable: () => any, reservedWidth: number = 0, fontHeight: number = 16) {
+    public addIconStatLine(
+        phaserName: string,
+        msg: string,
+        getVariable: () => any,
+        reservedWidth: number = 0,
+        fontHeight: number = GameConstants.ui.defaultFontSize,
+        backgroundColor?: number,
+        foregroundColor?: number
+    ) {
         const line = new UIIconStatLine(
             this.scene,
             this.x,
@@ -55,16 +66,22 @@ export default class UIColumn {
             msg,
             getVariable,
             this.align,
-            fontHeight
+            fontHeight,
+            backgroundColor,
+            foregroundColor
         )
         line.reservedWidth = reservedWidth
-        this.list.push(line)
-        this.latestY += Math.max(TEXT_SPACING, fontHeight)
-        return this
+        return this.addStatMessage(line)
     }
 
-    public addStatLine(msg: string, getVariable: () => any, fontHeight: number = 16) {
-        this.list.push(
+    public addStatLine(
+        msg: string,
+        getVariable: () => any,
+        fontHeight: number = GameConstants.ui.defaultFontSize,
+        backgroundColor?: number,
+        foregroundColor?: number
+    ) {
+        return this.addStatMessage(
             new UIStatLine(
                 this.scene,
                 this.x,
@@ -72,21 +89,21 @@ export default class UIColumn {
                 msg,
                 getVariable,
                 this.align,
-                fontHeight
+                fontHeight,
+                backgroundColor,
+                foregroundColor
             )
         )
-        this.latestY += Math.max(TEXT_SPACING, fontHeight)
-        return this
     }
 
-    public addFormattedStatLine(format: () => string, fontHeight = 16) {
-        this.list.push(new UIFormattedStatLine(this.scene, this.x, this.latestY, format, this.align, fontHeight))
-        this.latestY += Math.max(TEXT_SPACING, fontHeight)
-        return this
+    public addFormattedStatLine(format: () => string, fontHeight = GameConstants.ui.defaultFontSize) {
+        return this.addStatMessage(
+            new UIFormattedStatLine(this.scene, this.x, this.latestY, format, this.align, fontHeight)
+        )
     }
 
-    public addButtonLine(msg: string, onClick: () => any, fontHeight: number = 16) {
-        this.list.push(
+    public addButtonLine(msg: string, onClick: () => any, fontHeight: number = GameConstants.ui.defaultFontSize) {
+        return this.addStatMessage(
             new UITextButtonLine(
                 this.scene,
                 this.x,
@@ -97,12 +114,10 @@ export default class UIColumn {
                 fontHeight
             )
         )
-        this.latestY += Math.max(TEXT_SPACING, fontHeight)
-        return this
     }
 
-    public addStatButtonLine(msg: string, onClick: () => any, fontHeight: number = 16) {
-        this.list.push(
+    public addStatButtonLine(msg: string, onClick: () => any, fontHeight: number = GameConstants.ui.defaultFontSize) {
+        return this.addStatMessage(
             new UIStatButtonLine(
                 this.scene,
                 this.x,
@@ -113,23 +128,42 @@ export default class UIColumn {
                 fontHeight
             )
         )
-        this.latestY += Math.max(TEXT_SPACING, fontHeight)
+    }
+
+    public addTextLine(msg: string, fontHeight: number = GameConstants.ui.defaultFontSize) {
+        return this.addStatMessage(
+            new UITextLine(this.scene, this.x, this.latestY, msg, this.align, fontHeight)
+        )
+    }
+
+    public addStatMessage(message: UITextLine) {
+        message.setPosition(this.x, this.latestY)
+        message.setVisibility(this.isVisible)
+        this.list.push(message)
+        this.components.push(message)
+        this.latestY += Math.max(TEXT_SPACING, message.getHeight())
         return this
     }
 
-    public addTextLine(msg: string, fontHeight: number = 16) {
-        this.list.push(
-            new UITextLine(
-                this.scene, this.x, this.latestY, msg, this.align, fontHeight
-            )
-        )
-        this.latestY += Math.max(TEXT_SPACING, fontHeight)
+    public addRow(row: UITextRow) {
+        return this.addComponent(row)
+    }
+
+    public addColumn(column: UIColumn) {
+        return this.addComponent(column)
+    }
+
+    public addComponent(component: UIComponent) {
+        component.setPosition(this.x, this.latestY)
+        component.setVisibility(this.isVisible)
+        this.components.push(component)
+        this.latestY += Math.max(TEXT_SPACING, component.getHeight())
         return this
     }
 
     public update() {
-        for (const uiText of this.list) {
-            uiText.updateState()
+        for (const component of this.components) {
+            component.update()
         }
         if (Number.isFinite(this.maxTextWidth)) {
             this.setFontSize(this.fontSize, this.maxTextWidth)
@@ -152,14 +186,14 @@ export default class UIColumn {
             }
             if (line instanceof UIStatLine) {
                 line.statObject.setX(line.textObject.x + line.textObject.width)
+                line.updateState()
             }
         }
         return this
     }
 
     public addIconButton(iconName: string, fun: () => boolean, closeMonitor = true) {
-        this.iconButtons.push(
-            new UIIconButton(
+        const button = new UIIconButton(
                 this.scene, 
                 this.x, 
                 this.latestY, 
@@ -169,16 +203,13 @@ export default class UIColumn {
                     fun()
                 },
                 () => this.deselectButtons(), this.iconButtons.length + 1)
-        )
+        this.iconButtons.push(button)
+        this.components.push(button)
         this.latestY += TOOLBOX_WIDTH + TOOLBOX_SPACING
         return this
     }
 
     public deselectButtons() {
-        if (this.scene.player.playerState === PlayerState.holdingHandbook) {
-            this.scene.GUI.closeBook()
-            return
-        }
         const wasEquipped = this.scene.player.playerState !== PlayerState.holdingNothing
         if (wasEquipped) this.scene.sound.play("unequip")
         this.scene.player.playerState = PlayerState.holdingNothing
@@ -189,17 +220,43 @@ export default class UIColumn {
         this.iconButtons[index]?.activate()
     }
 
-    public getAsGameObjects(): (Phaser.GameObjects.Text | Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle)[] {
+    public getObjects(): UIObject[] {
         return [
-            ...this.list.flatMap(line => line.getObjects()),
-            ...this.iconButtons.flatMap(button => button.getObjects())
+            ...(this.backgroundRect ? [this.backgroundRect] : []),
+            ...this.components.flatMap(component => component.getObjects())
         ]
+    }
+
+    public getAsGameObjects() {
+        return this.getObjects()
+    }
+
+    public setPosition(x: number, y: number): this {
+        const dx = x - this.x
+        const dy = y - this.y
+        this.x = x
+        this.y = y
+        let nextY = y
+        this.components.forEach(component => {
+            component.setPosition(x, nextY)
+            nextY += Math.max(TEXT_SPACING, component.getHeight())
+        })
+        this.latestY = nextY
+        this.backgroundRect?.setPosition(this.backgroundRect.x + dx, this.backgroundRect.y + dy)
+        return this
+    }
+
+    public getWidth() {
+        return this.components.reduce((width, component) => Math.max(width, component.getWidth()), 0)
+    }
+
+    public getHeight() {
+        return this.latestY - this.y
     }
 
     public setVisibility(isVisible: boolean) {
         this.isVisible = isVisible
-        this.getAsGameObjects().forEach(gameObject => {
-            gameObject.setVisible(isVisible)
-        })
+        this.components.forEach(component => component.setVisibility(isVisible))
+        this.backgroundRect?.setVisible(isVisible)
     }
 }

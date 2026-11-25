@@ -1,46 +1,6 @@
 import type MainScene from "../CodeLuna"
-import { WINDOW } from "../main/constants"
-
-const pages = [
-    {
-        title: "WELCOME TO LUNA",
-        body: "Your goal is to gather Cosmorite gas and ship it back to Earth.\n\n" +
-            "Mine deposits yourself or build programmable robots. Return resources to the player base, " +
-            "then deploy gas until the quota is met.\n\n" +
-            "Move with WASD or the arrow keys. Select a tool from the numbered toolbar."
-    },
-    {
-        title: "ROBOTS & FACTORIES",
-        body: "Approach a CPU or factory and open its monitor. Factories build blocks and parts from " +
-            "your resources or the robot's storage.\n\n" +
-            "In a CPU monitor, add and edit functions, then press play. Programs keep running when " +
-            "the monitor closes. Robots unload resources near the base."
-    },
-    {
-        title: "ROBOT API: ACTIONS",
-        body: "move(x, y) - move relative to the robot\n" +
-            "aim(x, y), shoot(x, y) - aim or fire at world coordinates\n" +
-            "goToMine(), goHome() - set a destination\n" +
-            "selectBlock(name), place(x, y, factoryIndex)\n" +
-            "weld() - connect nearby blocks\n" +
-            "wait(seconds) - pause the program\n" +
-            "print(value) - write to public chat"
-    },
-    {
-        title: "ROBOT API: QUERIES",
-        body: "canMove(), canMine(), hasCpu(), hasDrill()\n\n" +
-            "getLunestone(), getCosmorite(), getFreeStorage(), getMeterRange()\n\n" +
-            "getChatText() returns all chat lines. getChatText(0) returns the oldest line; " +
-            "indices 0-49 address up to the latest 50 lines. Missing lines return an empty string.\n\n" +
-            "Programs support assignments, if/else, while, return and function calls."
-    },
-    {
-        title: "FIELD WARNINGS",
-        body: "It is advised to not go through rocky zones, as the moon snakes will most certainly get you\n\n" +
-            "Robots need storage space to continue mining and gas to move or fire.\n\n" +
-            "A launch consumes its payload plus 100 gas. The quota updates when the rocket has departed."
-    }
-]
+import GameConstants, { WINDOW } from "../main/constants"
+import MyColors from "../main/MyColors"
 
 export default class Handbook {
     readonly element: HTMLElement
@@ -50,8 +10,8 @@ export default class Handbook {
     private readonly pageNumber: HTMLSpanElement
     private readonly back: HTMLButtonElement
     private readonly next: HTMLButtonElement
-    private positionX = 20
-    private positionY = (WINDOW.y - 500) / 2
+    private positionX = GameConstants.handbook.horizontalMargin
+    private positionY = (WINDOW.y - GameConstants.handbook.height) / 2
     private scaleX = 1
     private scaleY = 1
 
@@ -67,27 +27,27 @@ export default class Handbook {
             zIndex: "10000",
             display: "none",
             boxSizing: "border-box",
-            width: "300px",
-            height: "500px",
-            padding: "24px",
+            width: `${GameConstants.handbook.width}px`,
+            height: `${GameConstants.handbook.height}px`,
+            padding: `${GameConstants.handbook.padding}px`,
             overflow: "hidden",
             transformOrigin: "top left",
             flexDirection: "column",
-            background: "#f6f0df",
-            border: "4px solid #55483e",
-            color: "#40372e",
+            background: MyColors.toCssHex(MyColors.handbookBackground),
+            border: `${GameConstants.handbook.borderWidth}px solid ${MyColors.toCssHex(MyColors.handbookBorder)}`,
+            color: MyColors.toCssHex(MyColors.handbookText),
             fontFamily: "sans-serif"
         })
 
         const style = document.createElement("style")
         style.textContent = `
             .game-handbook { user-select:none; }
-            .game-handbook .handbook-drag-bar { height:24px;flex:none;cursor:move;background:#55483e22;touch-action:none; }
-            .game-handbook h2 { margin:12px 0;font-size:19px; }
-            .game-handbook .handbook-body { flex:1;overflow:auto;white-space:pre-wrap;font-size:15px;line-height:1.45; }
-            .game-handbook .handbook-footer { display:flex;align-items:center;justify-content:space-between;margin-top:12px; }
-            .game-handbook button { border:0;background:transparent;color:#55483e;font-size:22px;font-weight:bold;cursor:pointer; }
-            .game-handbook .handbook-close { position:absolute;top:4px;right:4px;font-size:18px; }
+            .game-handbook .handbook-drag-bar { height:${GameConstants.handbook.dragBarHeight}px;flex:none;cursor:move;background:${MyColors.toCssHex(MyColors.handbookDragBar)};touch-action:none; }
+            .game-handbook h2 { margin:12px 0;font-size:${GameConstants.handbook.titleFontSize}px; }
+            .game-handbook .handbook-body { flex:1;overflow:auto;white-space:pre-wrap;font-size:${GameConstants.handbook.bodyFontSize}px;line-height:1.45; }
+            .game-handbook .handbook-footer { display:flex;align-items:center;justify-content:space-between;margin-top:${GameConstants.handbook.footerMarginTop}px; }
+            .game-handbook button { border:0;background:transparent;color:${MyColors.toCssHex(MyColors.handbookBorder)};font-size:${GameConstants.handbook.buttonFontSize}px;font-weight:bold;cursor:pointer; }
+            .game-handbook .handbook-close { position:absolute;top:4px;right:4px;font-size:${GameConstants.handbook.closeButtonFontSize}px; }
         `
         this.element.appendChild(style)
 
@@ -105,11 +65,11 @@ export default class Handbook {
             const initialY = this.positionY
             const move = (moveEvent: PointerEvent) => {
                 this.positionX = Math.max(0, Math.min(
-                    WINDOW.x - 300,
+                    WINDOW.x - GameConstants.handbook.width,
                     initialX + (moveEvent.clientX - startX) / this.scaleX
                 ))
                 this.positionY = Math.max(0, Math.min(
-                    WINDOW.y - 500,
+                    WINDOW.y - GameConstants.handbook.height,
                     initialY + (moveEvent.clientY - startY) / this.scaleY
                 ))
                 this.applyPosition()
@@ -145,9 +105,9 @@ export default class Handbook {
             })
             return button
         }
-        this.back = makeButton("\u25c0", "Previous page", () => this.turn(-1))
-        this.next = makeButton("\u25b6", "Next page", () => this.turn(1))
-        const closeButton = makeButton("X", "Close handbook", close)
+        this.back = makeButton("\u25c0", GameConstants.text.handbookPrevious, () => this.turn(-1))
+        this.next = makeButton("\u25b6", GameConstants.text.handbookNext, () => this.turn(1))
+        const closeButton = makeButton("X", GameConstants.text.handbookClose, close)
         closeButton.className = "handbook-close"
         footer.append(this.back, this.pageNumber, this.next)
         this.element.append(dragBar, this.title, this.body, footer, closeButton)
@@ -174,7 +134,7 @@ export default class Handbook {
     }
 
     setAboveGame(above: boolean) {
-        this.element.style.zIndex = above ? "10000" : "0"
+        this.element.style.zIndex = above ? "10000" : "9998"
     }
 
     position() {
@@ -193,7 +153,7 @@ export default class Handbook {
 
     private turn(direction: number) {
         const nextPage = this.page + direction
-        if (nextPage < 0 || nextPage >= pages.length) {
+        if (nextPage < 0 || nextPage >= GameConstants.handbookPages.length) {
             this.scene.cancelAction()
             return
         }
@@ -202,10 +162,14 @@ export default class Handbook {
     }
 
     private render() {
-        this.title.textContent = pages[this.page].title
-        this.body.textContent = pages[this.page].body
-        this.pageNumber.textContent = `${this.page + 1} / ${pages.length}`
-        this.back.style.opacity = this.page === 0 ? "0.3" : "1"
-        this.next.style.opacity = this.page === pages.length - 1 ? "0.3" : "1"
+        this.title.textContent = GameConstants.handbookPages[this.page].title
+        this.body.textContent = GameConstants.handbookPages[this.page].body
+        this.pageNumber.textContent = `${this.page + 1} / ${GameConstants.handbookPages.length}`
+        this.back.style.opacity = this.page === 0
+            ? String(GameConstants.handbook.pageDisabledOpacity)
+            : "1"
+        this.next.style.opacity = this.page === GameConstants.handbookPages.length - 1
+            ? String(GameConstants.handbook.pageDisabledOpacity)
+            : "1"
     }
 }

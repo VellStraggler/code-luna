@@ -1,6 +1,7 @@
 import MainScene from "../CodeLuna"
 import * as Phaser from 'phaser'
 import Player, { PlayerState } from "./Player"
+import GameConstants from "../main/constants"
 type ControlKeys = {
     up: Phaser.Input.Keyboard.Key
     down: Phaser.Input.Keyboard.Key
@@ -27,9 +28,8 @@ export default class Controls {
         }) as ControlKeys
         const onToolbarKeyDown = (event: KeyboardEvent) => {
             if (event.repeat || this.isTyping()) return
-            const index = ["Digit1", "Digit2", "Digit3", "Digit4", "Numpad1", "Numpad2", "Numpad3", "Numpad4"]
-                .indexOf(event.code)
-            if (index >= 0) this.scene.GUI.selectToolbarItem(index % 4)
+            const index = GameConstants.controls.toolbarKeyCodes.indexOf(event.code)
+            if (index >= 0) this.scene.GUI.selectToolbarItem(index % GameConstants.controls.toolbarItemCount)
         }
         window.addEventListener("keydown", onToolbarKeyDown)
         scene.events.once("shutdown", () => window.removeEventListener("keydown", onToolbarKeyDown))
@@ -122,8 +122,8 @@ export default class Controls {
 
         // diagonal movement
         if (goX!=0 && goY!=0) {
-            goX *= .7
-            goY *= .7
+            goX *= GameConstants.controls.diagonalMovementScale
+            goY *= GameConstants.controls.diagonalMovementScale
         }
         this.player.setVelocity(goX * speed, goY * speed)
         const moving = goX !== 0 || goY !== 0

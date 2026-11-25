@@ -1,6 +1,7 @@
 import type MainScene from "../CodeLuna"
 import type ModularRobot from "../bots/ModularRobot"
-import { GUI_DEPTH, GUI_MARGIN } from "../main/constants"
+import GameConstants, { GUI_DEPTH, GUI_MARGIN } from "../main/constants"
+import MyColors from "../main/MyColors"
 import PythonFunctions, { type RobotFunction } from "../main/PythonFunctions"
 import { removeLegacyStarterFunctions } from "../main/gameRules"
 
@@ -17,26 +18,29 @@ export default class RobotFunctionEditor {
         this.element.style.display = "none"
         this.element.innerHTML = `
             <style>
-                .robot-function-editor { position:fixed;box-sizing:border-box;flex-direction:column;color:white;font:14px monospace;transform-origin:top left;z-index:${GUI_DEPTH + 4}; }
-                .robot-function-editor .function-list { flex:1;min-height:0;overflow-y:scroll;overflow-x:hidden;overscroll-behavior:contain;scrollbar-color:white #173e17;scrollbar-width:thin; }
-                .robot-function-editor section { padding:2px 4px 6px 0;border-bottom:1px solid #ffffff66; }
+                .robot-function-editor { position:fixed;box-sizing:border-box;flex-direction:column;color:${MyColors.toCssHex(MyColors.white)};font:14px monospace;transform-origin:top left;z-index:${GUI_DEPTH + 4}; }
+                .robot-function-editor .function-list { flex:1;min-height:0;overflow-y:scroll;overflow-x:hidden;overscroll-behavior:contain;scrollbar-color:${MyColors.toCssHex(MyColors.white)} ${MyColors.toCssHex(MyColors.editorScrollbarTrack)};scrollbar-width:thin; }
+                .robot-function-editor section { padding:2px 4px 6px 0;border-bottom:1px solid ${MyColors.toCssHex(MyColors.whiteAlpha40)}; }
                 .robot-function-editor .function-heading { display:flex;align-items:center;gap:4px;min-height:28px; }
                 .robot-function-editor .function-signature { display:inline-flex;align-items:center;min-width:0; }
                 .robot-function-editor .function-signature span { flex-shrink:0; }
                 .robot-function-editor input { min-width:1ch;flex:0 1 auto;box-sizing:content-box;padding:0;border:0;background:transparent;color:inherit;font:inherit; }
-                .robot-function-editor button { flex-shrink:0;padding:2px 4px;border:1px solid white;background:#123d12;color:inherit;font:inherit;cursor:pointer; }
+                .robot-function-editor button { flex-shrink:0;padding:2px 4px;border:1px solid ${MyColors.toCssHex(MyColors.white)};background:${MyColors.toCssHex(MyColors.editorBackground)};color:inherit;font:inherit;cursor:pointer; }
                 .robot-function-editor .play-function { background:transparent; }
                 .robot-function-editor .expand-function { margin-left:auto;border:0;background:transparent;outline:none; }
                 .robot-function-editor .delete-function { border:0;background:transparent; }
                 .robot-function-editor .delete-function:not([hidden]) { margin-left:auto; }
                 .robot-function-editor .delete-function:not([hidden]) + .expand-function { margin-left:0; }
-                .robot-function-editor .function-error { margin-top:4px;color:#ffbaba;white-space:pre-wrap;overflow-wrap:anywhere; }
-                .robot-function-editor textarea { box-sizing:border-box;width:100%;min-height:60px;margin-top:4px;padding:4px;border:1px solid white;background:#123d12;color:inherit;font:inherit;line-height:20px;resize:none;overflow:hidden; }
-                .robot-function-editor .add-function { min-height:28px;margin-top:4px;text-align:left; }
+                .robot-function-editor .function-error { margin-top:4px;color:${MyColors.toCssHex(MyColors.editorError)};white-space:pre-wrap;overflow-wrap:anywhere; }
+                .robot-function-editor textarea { box-sizing:border-box;width:100%;min-height:60px;margin-top:4px;padding:4px;border:1px solid ${MyColors.toCssHex(MyColors.white)};background:${MyColors.toCssHex(MyColors.editorBackground)};color:inherit;font:inherit;line-height:20px;resize:none;overflow:hidden; }
+                .robot-function-editor .function-actions { display:flex;gap:4px;margin-top:4px; }
+                .robot-function-editor .function-actions button { flex:1;min-height:28px;text-align:center; }
             </style>
-            <div class="function-list" aria-label="Robot functions"></div>
-            <button type="button" class="add-function">+ Add function</button>
-            <button type="button" class="stop-function">Stop program</button>
+            <div class="function-list" aria-label="${GameConstants.text.functionEditorLabel}"></div>
+            <div class="function-actions">
+                <button type="button" class="add-function">${GameConstants.text.functionEditorAdd}</button>
+                <button type="button" class="stop-function">${GameConstants.text.functionEditorStop}</button>
+            </div>
         `
         this.viewport = this.element.querySelector<HTMLDivElement>(".function-list")!
         this.element.querySelector<HTMLButtonElement>(".stop-function")!.addEventListener("click", () => {
@@ -45,7 +49,11 @@ export default class RobotFunctionEditor {
         this.element.querySelector<HTMLButtonElement>(".add-function")!.addEventListener("click", () => {
             if (!this.robot) return
             const functions = this.robot.functions!
-            const definition = { name: `function${functions.length + 1}`, body: "", expanded: true }
+            const definition = {
+                name: `${GameConstants.text.functionDefaultNamePrefix}${functions.length + 1}`,
+                body: "",
+                expanded: true
+            }
             functions.push(definition)
             const name = this.appendFunction(definition)
             this.viewport.scrollTop = this.viewport.scrollHeight
@@ -95,15 +103,15 @@ export default class RobotFunctionEditor {
         const row = document.createElement("section")
         row.innerHTML = `
             <div class="function-heading">
-                <button type="button" class="play-function" aria-label="Run function" title="Run function">&#9654;</button>
+                <button type="button" class="play-function" aria-label="${GameConstants.text.functionEditorRun}" title="${GameConstants.text.functionEditorRun}">&#9654;</button>
                 <span class="function-signature">
-                    <input type="text" aria-label="Function name" spellcheck="false" autocomplete="off">
+                    <input type="text" aria-label="${GameConstants.text.functionName}" spellcheck="false" autocomplete="off">
                     <span>()</span>
                 </span>
-                <button type="button" class="delete-function" aria-label="Delete function" title="Delete function">&#128465;</button>
-                <button type="button" class="expand-function" aria-label="Toggle function body"></button>
+                <button type="button" class="delete-function" aria-label="${GameConstants.text.functionEditorDelete}" title="${GameConstants.text.functionEditorDelete}">&#128465;</button>
+                <button type="button" class="expand-function" aria-label="${GameConstants.text.functionEditorToggle}"></button>
             </div>
-            <textarea aria-label="Function body" placeholder="Function body..." spellcheck="false" autocapitalize="off"></textarea>
+            <textarea aria-label="${GameConstants.text.functionBodyLabel}" placeholder="${GameConstants.text.functionBody}" spellcheck="false" autocapitalize="off"></textarea>
             <div class="function-error" role="alert" hidden></div>
         `
         const name = row.querySelector<HTMLInputElement>("input")!
@@ -201,6 +209,10 @@ export default class RobotFunctionEditor {
                 this.resizeBody(body)
             }
         }
+    }
+
+    public setBelowHandbook(below: boolean) {
+        this.element.style.zIndex = below ? "9999" : "10002"
     }
 
     public position(screen: Phaser.GameObjects.Container) {

@@ -1,4 +1,4 @@
-import { BATTERY_SIZE, BLOCK_RES, BLOCK_WHEEL_NAME, DIRECTION_OFFSETS, ENERGY_MS_PER_WHEEL, FACTORY_BLOCK, GAS_MINE_RATE, generateId, LASER_ENERGY_USE, MINING_RATE_MS, PART_CPU_NAME, PART_DRILL_NAME, PART_GUN_NAME, STONE_MINE_RATE, WELDER_PART } from "../main/constants";
+import GameConstants, { BATTERY_SIZE, BLOCK_RES, BLOCK_WHEEL_NAME, DIRECTION_OFFSETS, ENERGY_MS_PER_WHEEL, FACTORY_BLOCK, GAS_MINE_RATE, generateId, LASER_ENERGY_USE, MINING_RATE_MS, PART_CPU_NAME, PART_DISH_NAME, PART_DRILL_NAME, PART_GUN_NAME, STONE_MINE_RATE, WELDER_PART } from "../main/constants";
 import ModularBlock from "./parts-and-blocks/ModularBlock";
 import { ModularPart } from "./parts-and-blocks/ModularPart";
 import { xy, XY } from "../main/XY";
@@ -14,7 +14,7 @@ import WheelBlock from "./parts-and-blocks/WheelBlock";
 import GameGeometry from "../main/GameGeometry";
 import FactoryBlock, { PrintStrings } from "./parts-and-blocks/FactoryBlock";
 import PythonFunctions, { type RobotFunction } from "../main/PythonFunctions";
-import { hasMiningCapacity, proxyRelativePosition } from "../main/gameRules";
+import { accumulateMovementIdleMs, hasMiningCapacity, proxyRelativePosition } from "../main/gameRules";
 
 /**
  * Holds larger robot data, such as the supposed source block,
@@ -43,6 +43,7 @@ export default class ModularRobot implements IGameFighter{
 
     private timeIdle = 0
     private wasDriving = false
+    private lastIdlePosition: XY | null = null
 
     goal: XY | null = null
     
@@ -342,7 +343,7 @@ export default class ModularRobot implements IGameFighter{
                 case('part-radio-transmitter'):
                     this.canSend = true
                     break
-                case('part-receiving-dish'):
+                case(PART_DISH_NAME):
                     this.canReceive = true
                     break
                 default:
@@ -538,7 +539,7 @@ export default class ModularRobot implements IGameFighter{
         }
         this.mine(delta)
 
-        this.moveToGoal(delta)
+        this.moveToGoal()
 
         const energyUsePerMs = this.getCalculatedEnergyUse()
         this.useEnergy((energyUsePerMs * delta) / 1000)
@@ -600,19 +601,13 @@ export default class ModularRobot implements IGameFighter{
 
     }
 
-    moveToGoal(delta: number) {
+    moveToGoal() {
         if (this.goal != null) {
 
             this.stepToPosition(this.goal)
-            let reachedGoal = XY.distance(this.goal, this.position) < BLOCK_RES*2
-            if(!this.lastPos.equals(this.position)) {
-                this.timeIdle = 0
-            } else {
-                this.timeIdle += delta
-            }
-
-            if (reachedGoal || this.timeIdle > 1000) {
+            if (XY.distance(this.goal, this.position) < BLOCK_RES * 2) {
                 this.goal = null
+                this.timeIdle = 0
                 this.wheels.forEach((wheel) => {wheel.deactivate()})
             }
         }
@@ -625,12 +620,41 @@ export default class ModularRobot implements IGameFighter{
         }
     }
 
+    public updateMovementIdle(delta: number) {
+        if (this.goal === null) {
+            this.lastIdlePosition = null
+            this.timeIdle = 0
+            return
+        }
+        const proxy = this.proxyGlobalBlock
+        const position = proxy
+            ? xy(proxy.image.x, proxy.image.y)
+            : xy(this.position.x, this.position.y)
+        const previousFramePosition = this.lastIdlePosition
+        this.lastIdlePosition = xy(position.x, position.y)
+        if (previousFramePosition === null) {
+            this.timeIdle = 0
+            return
+        }
+        this.timeIdle = accumulateMovementIdleMs(previousFramePosition, position, this.timeIdle, delta)
+        if (this.timeIdle >= GameConstants.game.robotMovementIdleTimeoutMs) {
+            this.goal = null
+            this.timeIdle = 0
+            this.lastIdlePosition = null
+            this.wheels.forEach(wheel => wheel.deactivate())
+        }
+    }
+
     hasCpu(): boolean { 
         return (this.cores > 0)
     }
 
     hasDrill(): boolean {
         return this.latestDrillPart != null
+    }
+
+    hasDish(): boolean {
+        return this.parts.some(part => part.assetKey === PART_DISH_NAME)
     }
 
     public getLastBlock(): ModularBlock | null {
@@ -670,7 +694,7 @@ export default class ModularRobot implements IGameFighter{
 
     public mine(delta:number) {
         const contact = this.getTouchingDrill()
-        if (contact && hasMiningCapacity(this.getFreeStorage())) {
+        if (contact && (this.isDrilling || hasMiningCapacity(this.getFreeStorage()))) {
             const { drill, site } = contact
             const minedAmount = Math.min((MINING_RATE_MS * delta)/1000, this.getFreeStorage(),
                 Math.max(0, this.storageSpace - this.storedLunestone - this.storedCosmorite))
@@ -765,6 +789,11 @@ export default class ModularRobot implements IGameFighter{
         if (!this.canMove() || this.storedCosmorite <= 0) this.scene.cancelAction()
         this.goal = goalPosition
         this.timeIdle = 0
+        const proxy = this.proxyGlobalBlock
+        const position = proxy
+            ? xy(proxy.image.x, proxy.image.y)
+            : xy(this.position.x, this.position.y)
+        this.lastIdlePosition = position
     }
     
     private stepToPosition(targetPosition: XY) {

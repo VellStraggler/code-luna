@@ -1,4 +1,4 @@
-import { BLOCK_RES, ENERGY_USE_MULT, PART_DRILL_NAME, WELDER_PART } from "../../main/constants";
+import { BLOCK_RES, ENERGY_USE_MULT, PART_DISH_NAME, PART_DRILL_NAME, WELDER_PART } from "../../main/constants";
 import IGameItemDefinition from "../contracts/IGameItemDefinition"
 import { XY, xy } from "../../main/XY";
 
@@ -23,7 +23,7 @@ export class PartDefinition implements IGameItemDefinition{
     static partCpu   =       new PartDefinition('part-cpu',               0.2, 3,   1,   1,  0)
     static partDrill =       new PartDefinition(PART_DRILL_NAME,          1,   3,   1,   1,  1  * ENERGY_USE_MULT, xy(0,-BLOCK_RES), 2)
     static partTransmitter = new PartDefinition('part-radio-transmitter', 0.2, 2,   0.5, 3,  0.5  * ENERGY_USE_MULT)
-    static partDish  =       new PartDefinition('part-receiving-dish',    0.5, 1,   1,   2,  0.5  * ENERGY_USE_MULT)
+    static partDish  =       new PartDefinition(PART_DISH_NAME,            0.5, 1,   1,   2,  0.5  * ENERGY_USE_MULT)
     static partBattery =     new PartDefinition('part-battery',           1,   6,   1,   1,  0  * ENERGY_USE_MULT)
     static partCamera =      new PartDefinition('part-camera',            0.4, 3,   1,   2,  1  * ENERGY_USE_MULT)
     static partGun =         new PartDefinition('part-gun',               0.5, 3,   1,   2,  0 * ENERGY_USE_MULT) //active only when firing
@@ -37,7 +37,7 @@ export class PartDefinition implements IGameItemDefinition{
         this.definitionsByAssetKey['part-cpu'] = PartDefinition.partCpu;
         this.definitionsByAssetKey[PART_DRILL_NAME] = PartDefinition.partDrill
         this.definitionsByAssetKey['part-radio-transmitter'] = PartDefinition.partTransmitter
-        this.definitionsByAssetKey['part-receiving-dish'] = PartDefinition.partDish
+        this.definitionsByAssetKey[PART_DISH_NAME] = PartDefinition.partDish
         this.definitionsByAssetKey['part-battery'] = PartDefinition.partBattery
         this.definitionsByAssetKey['part-camera'] = PartDefinition.partCamera
         this.definitionsByAssetKey['part-gun'] = PartDefinition.partGun

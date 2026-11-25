@@ -1,4 +1,4 @@
-import { generateId, LASER_DAMAGE, LASER_LIFE, LASER_SPEED, PART_DEPTH } from "../main/constants";
+import GameConstants, { generateId, LASER_DAMAGE, LASER_LIFE, LASER_SPEED, PART_DEPTH } from "../main/constants";
 import MainScene from "../CodeLuna";
 import { XY } from "../main/XY";
 import HPImage from "../main/HPImage";
@@ -31,14 +31,20 @@ export default class LaserShot {
         this.vec = start.getDirVector(destination)
         this.id = generateId()
         // place it at the from-Object
-        this.image = scene.add.rectangle(start.x, start.y, 2, 16, MyColors.red).setDepth(PART_DEPTH)
+        this.image = scene.add.rectangle(
+            start.x, start.y, GameConstants.laser.width, GameConstants.laser.height, MyColors.red
+        ).setDepth(PART_DEPTH)
         scene.addWorldObject(this.image)
         this.image.rotation = Math.atan2(this.vec.y, this.vec.x) + Math.PI / 2
 
         scene.uiCamera.ignore(this.image)
         scene.physics.add.existing(this.image)
         const body = this.image.body as Phaser.Physics.Arcade.Body
-        body.setCircle(2, -1)
+        body.setCircle(
+            GameConstants.laser.bodyRadius,
+            GameConstants.laser.bodyOffsetX,
+            GameConstants.laser.bodyOffsetY
+        )
         body.setVelocity(this.vec.x * this.speed, this.vec.y * this.speed)
 
         for(const enemy of enemies) {
@@ -69,7 +75,7 @@ export default class LaserShot {
 
     update(delta: number) {
         if(this.timeleft > 0 && !this.dead) {
-            this.timeleft -= (delta/1000)
+            this.timeleft -= (delta/GameConstants.laser.secondsPerMillisecond)
         } else {
             this.dead = true
             this.image.destroy()

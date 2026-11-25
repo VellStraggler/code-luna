@@ -1,3 +1,5 @@
+import GameConstants from "./constants"
+
 type ChatNode = { text: string, next: ChatNode | null }
 
 export default class PublicChat {
@@ -11,7 +13,7 @@ export default class PublicChat {
             if (this.last) this.last.next = node
             else this.first = node
             this.last = node
-            if (++this.length > 50) {
+            if (++this.length > GameConstants.game.publicChatMaxLines) {
                 this.first = this.first!.next
                 this.length--
             }

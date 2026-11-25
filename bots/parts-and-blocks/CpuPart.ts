@@ -1,5 +1,5 @@
 import MainScene from "../../CodeLuna";
-import { HIDE_POS, GUI_DEPTH } from "../../main/constants";
+import GameConstants, { HIDE_POS, GUI_DEPTH } from "../../main/constants";
 import MyColors from "../../main/MyColors";
 import Player from "../../player/Player";
 import ModularBlock from "./ModularBlock";
@@ -13,7 +13,7 @@ export default class CpuPart extends ModularPart {
     player: Player
     sourceRobot: ModularRobot
 
-    private static openText = 'open\n\n\nmonitor'
+    private static openText = GameConstants.text.openMonitorPrompt
 
     constructor(scene: MainScene, parentBlock: ModularBlock, robot: ModularRobot) {
         super(scene, parentBlock, PartDefinition.partCpu.assetKey)
@@ -22,11 +22,11 @@ export default class CpuPart extends ModularPart {
     }
 
     isNearPlayer(): boolean {
-        return (this.getDistanceToPlayer() < 30)
+        return (this.getDistanceToPlayer() < GameConstants.game.cpuInteractionRange)
     }
 
     getDistanceToPlayer(): number {
-        if (this.player == null) return 10000
+        if (this.player == null) return GameConstants.game.missingPlayerDistance
         const playerPosition = this.player.getPosition()
         const distance = Phaser.Math.Distance.Between(
             this.parentBlock.image.x,

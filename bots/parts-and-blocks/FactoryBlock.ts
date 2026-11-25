@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser'
 import MainScene from "../../CodeLuna"
-import { BLOCK_RES, Dirs } from "../../main/constants"
+import GameConstants, { BLOCK_RES, Dirs } from "../../main/constants"
 import { xy, XY } from "../../main/XY"
 import ModularRobot from "../ModularRobot"
 import { BlockDefinition } from "./BlockDefinition"
@@ -9,11 +9,11 @@ import ModularBlock from "./ModularBlock"
 import { PartDefinition } from "./PartDefinition"
 
 export const PrintStrings = {
-    success: "Printed.",
-    blocked: "Output blocked. Clear the selected side.",
-    unavailable: "Factory disconnected.",
-    unaffordable: "Not enough resources.",
-    tooManyParts: (partLimit: number) => `This block holds at most ${partLimit} parts.`
+    success: GameConstants.text.factoryPrinted,
+    blocked: GameConstants.text.factoryOutputBlocked,
+    unavailable: GameConstants.text.factoryDisconnected,
+    unaffordable: GameConstants.text.factoryNotEnoughResources,
+    tooManyParts: GameConstants.text.factoryPartLimit
 
 }
 
@@ -57,7 +57,7 @@ export default class FactoryBlock extends ModularBlock {
     }
 
     isNearPlayer() {
-        return this.getDistanceToPlayer() < 30
+        return this.getDistanceToPlayer() < GameConstants.game.factoryInteractionRange
     }
 
     getPrintCost() {

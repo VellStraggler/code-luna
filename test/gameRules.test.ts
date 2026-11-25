@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 import {
     calculateBlockDropResources,
+    accumulateMovementIdleMs,
+    getAcceleratedHoldBatch,
     getChatPanelY,
     hasMiningCapacity,
     isStorageCapacityReached,
@@ -12,6 +14,47 @@ import {
 } from "../main/gameRules"
 
 describe("robot game rules", () => {
+    it("accelerates held-button adjustments and returns the next tick time", () => {
+        expect(getAcceleratedHoldBatch(1500, 0, 100)).toEqual({
+            steps: 69,
+            nextAt: 1600
+        })
+        expect(getAcceleratedHoldBatch(99, 0, 100)).toEqual({
+            steps: 0,
+            nextAt: 100
+        })
+    })
+
+    it("resets the movement idle duration when either coordinate changes", () => {
+        expect(accumulateMovementIdleMs(
+            { x: 10, y: 20 },
+            { x: 10.0005, y: 20 },
+            900,
+            16
+        )).toBe(0)
+        expect(accumulateMovementIdleMs(
+            { x: 10, y: 20 },
+            { x: 10, y: 19.5 },
+            900,
+            16
+        )).toBe(0)
+    })
+
+    it("accumulates frame delta only while both position coordinates are unchanged", () => {
+        expect(accumulateMovementIdleMs(
+            { x: 10, y: 20 },
+            { x: 10, y: 20 },
+            250,
+            16
+        )).toBe(266)
+        expect(accumulateMovementIdleMs(
+            { x: 10, y: 20 },
+            { x: 10, y: 20 },
+            250,
+            -1
+        )).toBe(250)
+    })
+
     it("removes only unchanged legacy starter functions", () => {
         expect(removeLegacyStarterFunctions([
             { name: "sendToMine", body: "goToMine()" },
@@ -44,10 +87,10 @@ describe("robot game rules", () => {
         )).toEqual({ cosmorite: 0.05, lunestone: 0.5 })
     })
 
-    it("stops starting mining when storage is within 0.1 of capacity", () => {
-        expect(hasMiningCapacity(0.1)).toBe(false)
-        expect(hasMiningCapacity(0.0999)).toBe(false)
-        expect(hasMiningCapacity(0.1001)).toBe(true)
+    it("stops starting mining when storage is within 0.05 of capacity", () => {
+        expect(hasMiningCapacity(0.05)).toBe(false)
+        expect(hasMiningCapacity(0.0499)).toBe(false)
+        expect(hasMiningCapacity(0.0501)).toBe(true)
     })
 
     it("compares capacity at the precision shown in the monitor", () => {

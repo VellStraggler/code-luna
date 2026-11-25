@@ -1,8 +1,7 @@
-import * as Phaser from "phaser"
-import MainScene from "../CodeLuna"
-import PublicChat from "../main/PublicChat"
+import type MainScene from "../CodeLuna"
+import type PublicChat from "../main/PublicChat"
 import { getChatPanelY, updateChatScrollOffset, wrapChatText } from "../main/gameRules"
-import {
+import GameConstants, {
     CHAT_PANEL_BOTTOM_MARGIN,
     CHAT_PANEL_COLLAPSED_HEIGHT,
     CHAT_PANEL_CHARACTERS_PER_LINE,
@@ -12,84 +11,119 @@ import {
     CHAT_PANEL_SCROLL_LINES,
     CHAT_PANEL_VISIBLE_LINES,
     CHAT_PANEL_WIDTH,
-    GUI_DEPTH,
     WINDOW
 } from "../main/constants"
+import MyColors from "../main/MyColors"
 
 export default class RobotChatPanel {
-    readonly container: Phaser.GameObjects.Container
-    private readonly background: Phaser.GameObjects.Rectangle
-    private readonly messages: Phaser.GameObjects.Text
-    private readonly viewportY = CHAT_PANEL_HEADER_HEIGHT + CHAT_PANEL_PADDING
+    readonly element: HTMLElement
+    private readonly header: HTMLDivElement
+    private readonly toggle: HTMLButtonElement
+    private readonly messages: HTMLDivElement
     private scrollOffset = 0
     private previousMaxOffset = 0
     private previousText = ""
     private rows: string[] = []
-    private collapsed = false
-    private readonly wheelListener: (
-        pointer: Phaser.Input.Pointer,
-        objects: Phaser.GameObjects.GameObject[],
-        deltaX: number,
-        deltaY: number,
-        deltaZ: number,
-        event: WheelEvent
-    ) => void
+    private collapsed = true
+    private scaleX = 1
+    private scaleY = 1
 
     constructor(private scene: MainScene, private chat: PublicChat) {
-        const x = CHAT_PANEL_PADDING
-        const y = getChatPanelY(
-            WINDOW.y, CHAT_PANEL_HEIGHT, CHAT_PANEL_BOTTOM_MARGIN, false, CHAT_PANEL_COLLAPSED_HEIGHT
-        )
-        this.container = scene.add.container(x, y)
-            .setScrollFactor(0)
-            .setDepth(GUI_DEPTH)
-            .setSize(CHAT_PANEL_WIDTH, CHAT_PANEL_HEIGHT)
-        this.background = scene.add.rectangle(0, 0, CHAT_PANEL_WIDTH, CHAT_PANEL_HEIGHT, 0x000000, 0.7)
-            .setOrigin(0)
-        const header = scene.add.rectangle(0, 0, CHAT_PANEL_WIDTH, CHAT_PANEL_HEADER_HEIGHT, 0x163c66, 0.95)
-            .setOrigin(0)
-            .setInteractive({ useHandCursor: true })
-            .on("pointerdown", (_pointer: unknown, _x: unknown, _y: unknown, event: Phaser.Types.Input.EventData) => {
-                event.stopPropagation()
-                this.setCollapsed(!this.collapsed)
-            })
-        const title = scene.add.text(CHAT_PANEL_PADDING, CHAT_PANEL_HEADER_HEIGHT / 2, "Robot chat", {
-            fontSize: "13px", color: "#ffffff", fontStyle: "bold"
-        }).setOrigin(0, 0.5)
-        const toggle = scene.add.text(
-            CHAT_PANEL_WIDTH - CHAT_PANEL_PADDING,
-            CHAT_PANEL_HEADER_HEIGHT / 2,
-            "\u2212",
-            {
-            fontSize: "17px", color: "#ffffff", fontStyle: "bold"
-            }
-        ).setOrigin(1, 0.5).setInteractive({ useHandCursor: true })
-            .on("pointerdown", (_pointer: unknown, _x: unknown, _y: unknown, event: Phaser.Types.Input.EventData) => {
-                event.stopPropagation()
-                this.setCollapsed(!this.collapsed)
-            })
-        this.messages = scene.add.text(
-            CHAT_PANEL_PADDING,
-            this.viewportY,
-            "",
-            {
-                fontSize: "12px",
-                color: "#ffffff",
-                lineSpacing: 2
-            }
-        )
-        this.container.add([this.background, header, title, toggle, this.messages])
-
-        this.wheelListener = (pointer, _objects, _deltaX, deltaY, _deltaZ, event) => {
-            if (this.collapsed || !this.containsPoint(pointer.x, pointer.y)) return
-            event.stopPropagation()
-            this.setScrollOffset(this.scrollOffset + Math.sign(deltaY) * CHAT_PANEL_SCROLL_LINES)
-        }
-        scene.input.on("wheel", this.wheelListener)
-        scene.events.once("shutdown", () => {
-            scene.input.off("wheel", this.wheelListener)
+        this.element = document.createElement("section")
+        this.element.className = "robot-chat-panel"
+        Object.assign(this.element.style, {
+            position: "fixed",
+            zIndex: "10",
+            boxSizing: "border-box",
+            width: `${CHAT_PANEL_WIDTH}px`,
+            height: `${CHAT_PANEL_HEIGHT}px`,
+            overflow: "hidden",
+            transformOrigin: "top left",
+            border: `${GameConstants.chat.outlineWidth}px solid ${MyColors.toCssHex(GameConstants.chat.outlineColor)}`,
+            background: this.toRgba(GameConstants.chat.backgroundColor, GameConstants.chat.backgroundAlpha),
+            color: GameConstants.chat.textColor,
+            fontFamily: "sans-serif"
         })
+
+        this.header = document.createElement("div")
+        Object.assign(this.header.style, {
+            position: "absolute",
+            inset: "0 0 auto",
+            display: "flex",
+            height: `${CHAT_PANEL_HEADER_HEIGHT}px`,
+            boxSizing: "border-box",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: `0 ${CHAT_PANEL_PADDING}px`,
+            background: MyColors.toCssHex(GameConstants.chat.headerColor),
+            cursor: "pointer",
+            userSelect: "none"
+        })
+        const title = document.createElement("span")
+        title.textContent = GameConstants.text.robotChatTitle
+        Object.assign(title.style, {
+            color: GameConstants.chat.titleColor,
+            fontSize: `${GameConstants.chat.titleFontSize}px`,
+            fontWeight: "bold"
+        })
+        this.toggle = document.createElement("button")
+        this.toggle.type = "button"
+        this.toggle.setAttribute("aria-label", GameConstants.text.robotChatTitle)
+        Object.assign(this.toggle.style, {
+            padding: "0",
+            border: "0",
+            background: "transparent",
+            color: GameConstants.chat.textColor,
+            font: `bold ${GameConstants.chat.toggleFontSize}px sans-serif`,
+            lineHeight: "1",
+            cursor: "pointer"
+        })
+        this.header.append(title, this.toggle)
+        this.header.addEventListener("click", event => {
+            event.stopPropagation()
+            this.setCollapsed(!this.collapsed)
+        })
+        this.toggle.addEventListener("click", event => {
+            event.stopPropagation()
+            this.setCollapsed(!this.collapsed)
+        })
+
+        this.messages = document.createElement("div")
+        Object.assign(this.messages.style, {
+            position: "absolute",
+            left: `${CHAT_PANEL_PADDING}px`,
+            top: `${CHAT_PANEL_HEADER_HEIGHT + CHAT_PANEL_PADDING}px`,
+            right: `${CHAT_PANEL_PADDING}px`,
+            bottom: `${CHAT_PANEL_PADDING}px`,
+            overflow: "hidden",
+            whiteSpace: "pre-wrap",
+            overflowWrap: "anywhere",
+            color: GameConstants.chat.textColor,
+            fontSize: `${GameConstants.chat.messageFontSize}px`,
+            lineHeight: `${GameConstants.chat.messageFontSize + GameConstants.chat.messageLineSpacing}px`
+        })
+        this.element.append(this.header, this.messages)
+        this.element.addEventListener("wheel", event => {
+            event.preventDefault()
+            event.stopPropagation()
+            if (!this.collapsed) {
+                this.setScrollOffset(
+                    this.scrollOffset + Math.sign(event.deltaY) * CHAT_PANEL_SCROLL_LINES
+                )
+            }
+        }, { passive: false })
+        for (const event of ["pointerdown", "pointerup", "keydown", "keyup"]) {
+            this.element.addEventListener(event, event => event.stopPropagation())
+        }
+        document.body.appendChild(this.element)
+        window.addEventListener("resize", this.position)
+        this.scene.events.once("shutdown", () => {
+            window.removeEventListener("resize", this.position)
+            this.element.remove()
+        })
+        this.position()
         this.update()
+        this.setCollapsed(true)
     }
 
     update() {
@@ -98,10 +132,6 @@ export default class RobotChatPanel {
         if (nextText === this.previousText) return
 
         this.rows = nextRows
-        this.messages.setText(this.rows.slice(
-            this.scrollOffset,
-            this.scrollOffset + CHAT_PANEL_VISIBLE_LINES
-        ).join("\n"))
         this.previousText = nextText
         const nextMaxOffset = Math.max(0, this.rows.length - CHAT_PANEL_VISIBLE_LINES)
         this.scrollOffset = updateChatScrollOffset(
@@ -114,10 +144,33 @@ export default class RobotChatPanel {
     }
 
     containsPoint(x: number, y: number) {
-        const left = this.container.x
-        const top = this.container.y
-        return x >= left && x <= left + CHAT_PANEL_WIDTH &&
-            y >= top && y <= top + this.background.height
+        const panelY = getChatPanelY(
+            WINDOW.y,
+            CHAT_PANEL_HEIGHT,
+            CHAT_PANEL_BOTTOM_MARGIN,
+            this.collapsed,
+            CHAT_PANEL_COLLAPSED_HEIGHT
+        )
+        return x >= CHAT_PANEL_PADDING && x <= CHAT_PANEL_PADDING + CHAT_PANEL_WIDTH &&
+            y >= panelY && y <= panelY + (this.collapsed ? CHAT_PANEL_COLLAPSED_HEIGHT : CHAT_PANEL_HEIGHT)
+    }
+
+    private readonly position = () => {
+        const canvas = this.scene.game.canvas.getBoundingClientRect()
+        this.scaleX = canvas.width / this.scene.scale.gameSize.width
+        this.scaleY = canvas.height / this.scene.scale.gameSize.height
+        const y = getChatPanelY(
+            WINDOW.y,
+            CHAT_PANEL_HEIGHT,
+            CHAT_PANEL_BOTTOM_MARGIN,
+            this.collapsed,
+            CHAT_PANEL_COLLAPSED_HEIGHT
+        )
+        Object.assign(this.element.style, {
+            left: `${canvas.left + CHAT_PANEL_PADDING * this.scaleX}px`,
+            top: `${canvas.top + y * this.scaleY}px`,
+            transform: `scale(${this.scaleX}, ${this.scaleY})`
+        })
     }
 
     private setScrollOffset(offset: number) {
@@ -126,31 +179,24 @@ export default class RobotChatPanel {
     }
 
     private renderVisibleRows() {
-        this.messages
-            .setY(this.viewportY)
-            .setText(this.rows.slice(
-                this.scrollOffset,
-                this.scrollOffset + CHAT_PANEL_VISIBLE_LINES
-            ).join("\n"))
+        this.messages.textContent = this.rows.slice(
+            this.scrollOffset,
+            this.scrollOffset + CHAT_PANEL_VISIBLE_LINES
+        ).join("\n")
     }
 
     private setCollapsed(collapsed: boolean) {
         this.collapsed = collapsed
-        const height = collapsed ? CHAT_PANEL_COLLAPSED_HEIGHT : CHAT_PANEL_HEIGHT
-        this.container.setSize(
-            CHAT_PANEL_WIDTH,
-            height
-        ).setY(getChatPanelY(
-            WINDOW.y,
-            CHAT_PANEL_HEIGHT,
-            CHAT_PANEL_BOTTOM_MARGIN,
-            collapsed,
-            CHAT_PANEL_COLLAPSED_HEIGHT
-        ))
-        this.background.setSize(
-            CHAT_PANEL_WIDTH,
-            height
-        )
-        this.messages.setVisible(!collapsed)
+        this.toggle.textContent = collapsed
+            ? GameConstants.text.chatCollapsedLabel
+            : GameConstants.text.chatExpandedLabel
+        this.toggle.setAttribute("aria-expanded", String(!collapsed))
+        this.element.style.height = `${collapsed ? CHAT_PANEL_COLLAPSED_HEIGHT : CHAT_PANEL_HEIGHT}px`
+        this.messages.style.display = collapsed ? "none" : "block"
+        this.position()
+    }
+
+    private toRgba(color: number, alpha: number) {
+        return `rgba(${(color >> 16) & 0xff}, ${(color >> 8) & 0xff}, ${color & 0xff}, ${alpha})`
     }
 }

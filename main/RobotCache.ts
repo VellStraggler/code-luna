@@ -4,10 +4,8 @@ import ModularBlock from "../bots/parts-and-blocks/ModularBlock"
 import FactoryBlock from "../bots/parts-and-blocks/FactoryBlock"
 import { BlockDefinition } from "../bots/parts-and-blocks/BlockDefinition"
 import { PartDefinition } from "../bots/parts-and-blocks/PartDefinition"
-import { BLOCK_RES, Dirs } from "./constants"
+import GameConstants, { BLOCK_RES, Dirs } from "./constants"
 import { xy } from "./XY"
-
-const KEY = "code-luna-robots-v1"
 
 type Point = { x: number, y: number }
 type BlockReference = { robot: number, block: number }
@@ -21,7 +19,7 @@ type SavedRobot = {
     position: Point, direction: number, hasMoved: boolean, proxy: number,
     blocks: SavedBlock[], functions: { name: string, body: string, expanded: boolean }[] | null
 }
-type Save = { version: 1, robots: SavedRobot[] }
+type Save = { version: typeof GameConstants.persistence.version, robots: SavedRobot[] }
 
 const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value)
 const point = (value: any): value is Point => value != null && finite(value.x) && finite(value.y)
@@ -31,7 +29,7 @@ const partType = (name: unknown) => typeof name === "string" &&
     (name === PartDefinition.unknown.assetKey || PartDefinition.fromAssetKey(name) !== PartDefinition.unknown)
 
 function validSave(value: any): value is Save {
-    if (!value || value.version !== 1 || !Array.isArray(value.robots)) return false
+    if (!value || value.version !== GameConstants.persistence.version || !Array.isArray(value.robots)) return false
     return value.robots.every((robot: any) =>
         robot && point(robot.position) && finite(robot.direction) && typeof robot.hasMoved === "boolean" &&
         Array.isArray(robot.blocks) && robot.blocks.length > 0 &&
@@ -47,7 +45,9 @@ function validSave(value: any): value is Save {
                 block.printedBy.robot >= 0 && block.printedBy.block >= 0 &&
                 block.printedBy.robot < value.robots.length &&
                 block.printedBy.block < value.robots[block.printedBy.robot]?.blocks?.length)) &&
-            Array.isArray(block.parts) && block.parts.length <= 4 && block.parts.every((part: any) =>
+            Array.isArray(block.parts) &&
+            block.parts.length <= GameConstants.persistence.maxPartsPerBlock &&
+            block.parts.every((part: any) =>
                 part && partType(part.type) && point(part.position) && finite(part.rotation)) &&
             (block.factory === null || (block.type === BlockDefinition.factory.assetKey &&
                 block.factory && blockType(block.factory.block) && Array.isArray(block.factory.parts) &&
@@ -65,10 +65,10 @@ export default class RobotCache {
     load(): boolean {
         let save: Save
         try {
-            const raw = localStorage.getItem(KEY)
+            const raw = localStorage.getItem(GameConstants.persistence.storageKey)
             if (raw === null) return false
             const data: unknown = JSON.parse(raw)
-            if (!validSave(data)) throw new Error("Unrecognized robot save")
+            if (!validSave(data)) throw new Error(GameConstants.errors.invalidRobotSave)
             save = data
         } catch (error) {
             this.disable(error)
@@ -142,7 +142,7 @@ export default class RobotCache {
             robots.forEach((robot, robotIndex) => robot.blocks.forEach((block, blockIndex) =>
                 references.set(block, { robot: robotIndex, block: blockIndex })))
             const save: Save = {
-                version: 1,
+                version: GameConstants.persistence.version,
                 robots: robots.map(robot => ({
                     position: { x: robot.position.x, y: robot.position.y },
                     direction: robot.movingDirectionRadians,
@@ -171,8 +171,8 @@ export default class RobotCache {
                     }))
                 }))
             }
-            if (!validSave(save)) throw new Error("Robot state cannot be saved")
-            localStorage.setItem(KEY, JSON.stringify(save))
+            if (!validSave(save)) throw new Error(GameConstants.errors.robotSaveInvalid)
+            localStorage.setItem(GameConstants.persistence.storageKey, JSON.stringify(save))
         } catch (error) {
             this.disable(error)
         }
@@ -180,7 +180,7 @@ export default class RobotCache {
 
     private disable(error: unknown) {
         this.enabled = false
-        console.warn("Robot cache unavailable; existing data was not overwritten.", error)
+        console.warn(GameConstants.errors.robotCacheUnavailable, error)
         this.warn()
     }
 }

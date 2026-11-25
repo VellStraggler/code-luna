@@ -11,6 +11,7 @@ import CpuPart from "./CpuPart";
 import BaseGameItem from "../contracts/BaseGameItem";
 import * as Phaser from 'phaser'
 import ResourceDrop from "../../main/ResourceDrop"
+import MyColors from "../../main/MyColors"
 import { calculateBlockDropResources } from "../../main/gameRules"
 
 
@@ -78,7 +79,7 @@ export default class ModularBlock extends BaseGameItem {
             let overlay = this.freshnessImages.get(image)
             if (!overlay) {
                 overlay = this.scene.add.image(image.x, image.y, image.texture.key, image.frame.name)
-                    .setTint(0xffffff)
+                    .setTint(MyColors.white)
                     .setTintMode(Phaser.TintModes.FILL)
                 this.freshnessImages.set(image, overlay)
                 this.scene.uiCamera.ignore(overlay)
@@ -306,7 +307,10 @@ export default class ModularBlock extends BaseGameItem {
         this.updateAnimation(animateRobot)
 
         for(const part of this.modularParts) {
-            part.update(animateRobot || (animateScene && part.assetKey === PART_DRILL_NAME))
+            const isDrill = part.assetKey === PART_DRILL_NAME
+            part.update(isDrill
+                ? animateScene && this.robot.isDrilling && part.isActive
+                : animateRobot)
         }
         this.updateFreshness()
 

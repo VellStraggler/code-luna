@@ -1,5 +1,7 @@
-export const MINING_STORAGE_RESERVE = 0.1
-export const CHAT_SCROLL_BOTTOM_THRESHOLD = 2
+import GameConstants from "./constants"
+
+export const MINING_STORAGE_RESERVE = GameConstants.game.miningStorageReserve
+export const CHAT_SCROLL_BOTTOM_THRESHOLD = GameConstants.game.chatScrollBottomThreshold
 
 export type ResourceCosts = {
     gasCost: number
@@ -7,6 +9,31 @@ export type ResourceCosts = {
 }
 
 export type Position = { x: number, y: number }
+
+export function getAcceleratedHoldBatch(now: number, startedAt: number, nextAt: number) {
+    let steps = 0
+    while (now >= nextAt) {
+        const seconds = Math.floor((nextAt - startedAt) / 1000)
+        const interval = seconds < 2 ? 100 : 1
+        const step = seconds < 2 ? Math.pow(10, seconds) : 100 * Math.pow(10, Math.min(seconds - 2, 9))
+        const end = Math.min(now, startedAt + (seconds + 1) * 1000 - 0.0001)
+        const count = Math.max(1, Math.floor((end - nextAt) / interval) + 1)
+        steps += step * count
+        nextAt += interval * count
+    }
+    return { steps, nextAt }
+}
+
+export function accumulateMovementIdleMs(
+    previousFramePosition: Position,
+    currentPosition: Position,
+    idleMs: number,
+    frameDeltaMs: number
+) {
+    if (previousFramePosition.x !== currentPosition.x ||
+        previousFramePosition.y !== currentPosition.y) return 0
+    return idleMs + Math.max(0, frameDeltaMs)
+}
 
 export function proxyRelativePosition(
     proxyPosition: Position,
