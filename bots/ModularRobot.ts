@@ -14,7 +14,13 @@ import WheelBlock from "./parts-and-blocks/WheelBlock";
 import GameGeometry from "../main/GameGeometry";
 import FactoryBlock, { PrintStrings } from "./parts-and-blocks/FactoryBlock";
 import PythonFunctions, { type RobotFunction } from "../main/PythonFunctions";
-import { accumulateMovementIdleMs, hasMiningCapacity, proxyRelativePosition } from "../main/gameRules";
+import {
+    accumulateMovementIdleMs,
+    getMovementIdleSample,
+    hasMiningCapacity,
+    metersToPixels,
+    proxyRelativePosition
+} from "../main/gameRules";
 
 /**
  * Holds larger robot data, such as the supposed source block,
@@ -44,6 +50,8 @@ export default class ModularRobot implements IGameFighter{
     private timeIdle = 0
     private wasDriving = false
     private lastIdlePosition: XY | null = null
+    private lastIdleBody: Phaser.Physics.Arcade.Body | null = null
+    private movementIdleSampleElapsedMs = 0
 
     goal: XY | null = null
     
@@ -570,7 +578,10 @@ export default class ModularRobot implements IGameFighter{
     }
 
     move(x:number, y: number) {
-        this.setGoal(xy(this.getPosition().x + x, this.getPosition().y + y))
+        this.setGoal(xy(
+            this.getPosition().x + metersToPixels(x),
+            this.getPosition().y + metersToPixels(y)
+        ))
     }
 
     place(xOffset:number, yOffset: number, factoryBlockIndex = 0): boolean {
@@ -623,24 +634,44 @@ export default class ModularRobot implements IGameFighter{
     public updateMovementIdle(delta: number) {
         if (this.goal === null) {
             this.lastIdlePosition = null
+            this.lastIdleBody = null
             this.timeIdle = 0
+            this.movementIdleSampleElapsedMs = 0
             return
         }
-        const proxy = this.proxyGlobalBlock
-        const position = proxy
-            ? xy(proxy.image.x, proxy.image.y)
-            : xy(this.position.x, this.position.y)
-        const previousFramePosition = this.lastIdlePosition
-        this.lastIdlePosition = xy(position.x, position.y)
-        if (previousFramePosition === null) {
+        const body = this.proxyGlobalBlock?.image.body
+        if (!(body instanceof Phaser.Physics.Arcade.Body) || !body.enable) {
+            this.lastIdlePosition = null
+            this.lastIdleBody = null
             this.timeIdle = 0
+            this.movementIdleSampleElapsedMs = 0
             return
         }
-        this.timeIdle = accumulateMovementIdleMs(previousFramePosition, position, this.timeIdle, delta)
+        if (this.lastIdleBody !== body || this.lastIdlePosition === null) {
+            this.lastIdleBody = body
+            this.lastIdlePosition = xy(body.position.x, body.position.y)
+            this.timeIdle = 0
+            this.movementIdleSampleElapsedMs = 0
+            return
+        }
+
+        const sampleInterval = GameConstants.game.robotMovementIdleCheckIntervalMs
+        const sample = getMovementIdleSample(
+            this.movementIdleSampleElapsedMs, delta, sampleInterval
+        )
+        this.movementIdleSampleElapsedMs = sample.remainderMs
+        if (!sample.shouldSample) return
+        const position = xy(body.position.x, body.position.y)
+        this.timeIdle = accumulateMovementIdleMs(
+            this.lastIdlePosition, position, this.timeIdle, sample.elapsedMs
+        )
+        this.lastIdlePosition = position
         if (this.timeIdle >= GameConstants.game.robotMovementIdleTimeoutMs) {
             this.goal = null
             this.timeIdle = 0
             this.lastIdlePosition = null
+            this.lastIdleBody = null
+            this.movementIdleSampleElapsedMs = 0
             this.wheels.forEach(wheel => wheel.deactivate())
         }
     }
@@ -790,10 +821,12 @@ export default class ModularRobot implements IGameFighter{
         this.goal = goalPosition
         this.timeIdle = 0
         const proxy = this.proxyGlobalBlock
-        const position = proxy
-            ? xy(proxy.image.x, proxy.image.y)
-            : xy(this.position.x, this.position.y)
-        this.lastIdlePosition = position
+        const body = proxy?.image.body
+        this.lastIdleBody = body instanceof Phaser.Physics.Arcade.Body ? body : null
+        this.lastIdlePosition = this.lastIdleBody
+            ? xy(this.lastIdleBody.position.x, this.lastIdleBody.position.y)
+            : null
+        this.movementIdleSampleElapsedMs = 0
     }
     
     private stepToPosition(targetPosition: XY) {

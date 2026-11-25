@@ -37,7 +37,7 @@ The language supports numbers, strings, `True`, `False`, `None`, local assignmen
 arithmetic, comparisons, `and`, `or`, `not`, `if`/`else`, `while`, and `return`.
 It is a Python-like subset, not full Python. Indent blocks with spaces.
 
-Commands are `move(x, y)` (relative world units), `aim(x, y)`, `shoot(x, y)`
+Commands are `move(x, y)` (relative meters; one block is 32 pixels), `aim(x, y)`, `shoot(x, y)`
 (world coordinates), `selectBlock(name)`, `place(x, y, factoryIndex)` (factoryIndex
 defaults to 0), `weld()`, `goToMine()`, `goHome()`, and `wait(seconds)`. Queries
 include `canMove()`, `canMine()`, `hasCpu()`, `hasDrill()`, `getLunestone()`,

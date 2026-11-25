@@ -1,4 +1,4 @@
-import GameConstants from "./constants"
+import GameConstants, { PIXELS_PER_METER } from "./constants"
 
 export const MINING_STORAGE_RESERVE = GameConstants.game.miningStorageReserve
 export const CHAT_SCROLL_BOTTOM_THRESHOLD = GameConstants.game.chatScrollBottomThreshold
@@ -9,6 +9,10 @@ export type ResourceCosts = {
 }
 
 export type Position = { x: number, y: number }
+
+export function metersToPixels(meters: number) {
+    return meters * PIXELS_PER_METER
+}
 
 export function getAcceleratedHoldBatch(now: number, startedAt: number, nextAt: number) {
     let steps = 0
@@ -25,14 +29,30 @@ export function getAcceleratedHoldBatch(now: number, startedAt: number, nextAt: 
 }
 
 export function accumulateMovementIdleMs(
-    previousFramePosition: Position,
-    currentPosition: Position,
+    previousSamplePosition: Position,
+    currentSamplePosition: Position,
     idleMs: number,
     frameDeltaMs: number
 ) {
-    if (previousFramePosition.x !== currentPosition.x ||
-        previousFramePosition.y !== currentPosition.y) return 0
+    if (previousSamplePosition.x !== currentSamplePosition.x ||
+        previousSamplePosition.y !== currentSamplePosition.y) return 0
     return idleMs + Math.max(0, frameDeltaMs)
+}
+
+export function getMovementIdleSample(
+    elapsedMs: number,
+    frameDeltaMs: number,
+    intervalMs: number
+) {
+    const totalElapsedMs = Math.max(0, elapsedMs) + Math.max(0, frameDeltaMs)
+    if (totalElapsedMs < intervalMs) {
+        return { shouldSample: false, elapsedMs: 0, remainderMs: totalElapsedMs }
+    }
+    return {
+        shouldSample: true,
+        elapsedMs: totalElapsedMs,
+        remainderMs: 0
+    }
 }
 
 export function proxyRelativePosition(

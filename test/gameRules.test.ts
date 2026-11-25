@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest"
 import {
     calculateBlockDropResources,
     accumulateMovementIdleMs,
+    getMovementIdleSample,
     getAcceleratedHoldBatch,
     getChatPanelY,
     hasMiningCapacity,
     isStorageCapacityReached,
+    metersToPixels,
     PLACE_SOUND_KEYS,
     proxyRelativePosition,
     removeLegacyStarterFunctions,
@@ -53,6 +55,32 @@ describe("robot game rules", () => {
             250,
             -1
         )).toBe(250)
+    })
+
+    it("checks movement at roughly a 100ms cadence", () => {
+        const firstFrame = getMovementIdleSample(80, 16, 100)
+        expect(firstFrame).toEqual({
+            shouldSample: false,
+            elapsedMs: 0,
+            remainderMs: 96
+        })
+        const firstSample = getMovementIdleSample(firstFrame.remainderMs, 16, 100)
+        expect(firstSample).toEqual({
+            shouldSample: true,
+            elapsedMs: 112,
+            remainderMs: 0
+        })
+        expect(getMovementIdleSample(96, 16, 100)).toEqual({
+            shouldSample: true,
+            elapsedMs: 112,
+            remainderMs: 0
+        })
+    })
+
+    it("converts move distances in meters using 32 pixels per meter", () => {
+        expect(metersToPixels(1)).toBe(32)
+        expect(metersToPixels(-0.5)).toBe(-16)
+        expect(metersToPixels(2.25)).toBe(72)
     })
 
     it("removes only unchanged legacy starter functions", () => {

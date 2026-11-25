@@ -18,6 +18,7 @@ import MyColors from "../main/MyColors"
 export default class RobotChatPanel {
     readonly element: HTMLElement
     private readonly header: HTMLDivElement
+    private readonly title: HTMLSpanElement
     private readonly toggle: HTMLButtonElement
     private readonly messages: HTMLDivElement
     private scrollOffset = 0
@@ -59,12 +60,13 @@ export default class RobotChatPanel {
             cursor: "pointer",
             userSelect: "none"
         })
-        const title = document.createElement("span")
-        title.textContent = GameConstants.text.robotChatTitle
-        Object.assign(title.style, {
+        this.title = document.createElement("span")
+        this.title.textContent = GameConstants.text.robotChatTitle
+        Object.assign(this.title.style, {
             color: GameConstants.chat.titleColor,
             fontSize: `${GameConstants.chat.titleFontSize}px`,
-            fontWeight: "bold"
+            fontWeight: "bold",
+            paddingBottom: "0"
         })
         this.toggle = document.createElement("button")
         this.toggle.type = "button"
@@ -78,7 +80,7 @@ export default class RobotChatPanel {
             lineHeight: "1",
             cursor: "pointer"
         })
-        this.header.append(title, this.toggle)
+        this.header.append(this.title, this.toggle)
         this.header.addEventListener("click", event => {
             event.stopPropagation()
             this.setCollapsed(!this.collapsed)
@@ -92,7 +94,6 @@ export default class RobotChatPanel {
         Object.assign(this.messages.style, {
             position: "absolute",
             left: `${CHAT_PANEL_PADDING}px`,
-            top: `${CHAT_PANEL_HEADER_HEIGHT + CHAT_PANEL_PADDING}px`,
             right: `${CHAT_PANEL_PADDING}px`,
             bottom: `${CHAT_PANEL_PADDING}px`,
             overflow: "hidden",
@@ -192,6 +193,18 @@ export default class RobotChatPanel {
             : GameConstants.text.chatExpandedLabel
         this.toggle.setAttribute("aria-expanded", String(!collapsed))
         this.element.style.height = `${collapsed ? CHAT_PANEL_COLLAPSED_HEIGHT : CHAT_PANEL_HEIGHT}px`
+        const headerHeight = collapsed
+            ? CHAT_PANEL_HEADER_HEIGHT
+            : GameConstants.chat.expandedHeaderHeight
+        this.header.style.height = `${headerHeight}px`
+        const bottomPadding = collapsed
+            ? GameConstants.chat.titleBottomPadding
+            : 0
+        this.title.style.paddingBottom = `${bottomPadding}px`
+        this.toggle.style.paddingBottom = collapsed
+            ? `${GameConstants.chat.toggleBottomPadding}px`
+            : "0"
+        this.messages.style.top = `${headerHeight + CHAT_PANEL_PADDING}px`
         this.messages.style.display = collapsed ? "none" : "block"
         this.position()
     }

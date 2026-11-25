@@ -37,6 +37,7 @@ export const WINDOW = xy(800,600)
 export const WINDOW_HALF = xy(WINDOW.x/2, WINDOW.y/2)
 export const HIDE_POS = xy(-1000,-1000)
 export const BLOCK_RES = 16
+export const PIXELS_PER_METER = BLOCK_RES * 2
 export const BASE_POS = xy(300,300)
 export const BASE_ZONE_RADIUS = BLOCK_RES * 4
 export const TELEPORT_RANGE = 200
@@ -156,9 +157,12 @@ export default class GameConstants {
         headerColor: MyColors.chatHeader,
         headerAlpha: 1,
         outlineColor: MyColors.white,
-        outlineWidth: 2,
-        titleFontSize: 13,
+        outlineWidth: 1,
+        titleFontSize: 12,
+        titleBottomPadding: 2,
         toggleFontSize: 17,
+        toggleBottomPadding: 4,
+        expandedHeaderHeight: 18,
         messageFontSize: 12,
         messageLineSpacing: 2,
         textColor: MyColors.toCssHex(MyColors.white),
@@ -215,6 +219,7 @@ export default class GameConstants {
         initialResourceAmount: 10,
         robotSaveIntervalMs: 1000,
         robotMovementIdleTimeoutMs: 1000,
+        robotMovementIdleCheckIntervalMs: 100,
         cpuInteractionRange: 30,
         factoryInteractionRange: 30,
         missingPlayerDistance: 10000,
@@ -262,7 +267,7 @@ export default class GameConstants {
 
     static readonly text = {
         robotSavingUnavailable: "Robot saving unavailable. Check browser storage.",
-        robotChatTitle: "Robot chat",
+        robotChatTitle: "Robot Chat",
         chatCollapsedLabel: "+",
         chatExpandedLabel: "\u2212",
         storageLabel: "storage:",
@@ -369,7 +374,7 @@ export default class GameConstants {
         },
         {
             title: "ROBOT API: ACTIONS",
-            body: "move(x, y) - move relative to the robot\n" +
+            body: "move(x, y) - move relative to the robot in meters (1 block = 1 meter)\n" +
                 "aim(x, y), shoot(x, y) - aim or fire at world coordinates\n" +
                 "goToMine(), goHome() - set a destination\n" +
                 "selectBlock(name), place(x, y, factoryIndex)\n" +
