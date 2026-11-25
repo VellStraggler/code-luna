@@ -54,6 +54,7 @@ export enum Dirs {
 export const GUI_SIZE = xy(500,300)
 export const GUI_SECONDARY_SIZE = xy(120, GUI_SIZE.y)
 export const GUI_MARGIN = 4
+export const MONITOR_GAP = 10
 export const FACTORY_GUI_PADDING = 32
 export const GUI_TEXT_START = xy(
     WINDOW_HALF.x - GUI_SIZE.x/2 + GUI_MARGIN,

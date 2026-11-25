@@ -16,8 +16,8 @@ import FactoryBlock, { PrintStrings } from "./parts-and-blocks/FactoryBlock";
 import PythonFunctions, { type RobotFunction } from "../main/PythonFunctions";
 import {
     accumulateMovementIdleMs,
+    canContinueMining,
     getMovementIdleSample,
-    hasMiningCapacity,
     metersToPixels,
     proxyRelativePosition
 } from "../main/gameRules";
@@ -725,7 +725,12 @@ export default class ModularRobot implements IGameFighter{
 
     public mine(delta:number) {
         const contact = this.getTouchingDrill()
-        if (contact && (this.isDrilling || hasMiningCapacity(this.getFreeStorage()))) {
+        if (contact && canContinueMining(
+            this.storedLunestone + this.storedCosmorite,
+            this.storageSpace,
+            this.getFreeStorage(),
+            this.isDrilling
+        )) {
             const { drill, site } = contact
             const minedAmount = Math.min((MINING_RATE_MS * delta)/1000, this.getFreeStorage(),
                 Math.max(0, this.storageSpace - this.storedLunestone - this.storedCosmorite))

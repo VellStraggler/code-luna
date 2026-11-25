@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
     calculateBlockDropResources,
     accumulateMovementIdleMs,
+    canContinueMining,
     getMovementIdleSample,
     getAcceleratedHoldBatch,
     getChatPanelY,
@@ -125,6 +126,14 @@ describe("robot game rules", () => {
         expect(isStorageCapacityReached(20.96, 21)).toBe(true)
         expect(isStorageCapacityReached(20.94, 21)).toBe(false)
         expect(isStorageCapacityReached(0, 0)).toBe(false)
+    })
+
+    it("prevents drilling when displayed storage rounds to capacity, including during mining", () => {
+        expect(canContinueMining(20.96, 21, 0.04, false)).toBe(false)
+        expect(canContinueMining(20.96, 21, 0.04, true)).toBe(false)
+        expect(canContinueMining(20.94, 21, 0.06, true)).toBe(true)
+        expect(canContinueMining(20.94, 21, 0.06, false)).toBe(true)
+        expect(canContinueMining(20.94, 21, 0.04, false)).toBe(false)
     })
 
     it("keeps chat pinned to the bottom only when it was already there", () => {

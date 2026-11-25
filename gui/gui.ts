@@ -1,7 +1,7 @@
 import * as Phaser from "phaser"
 import MainStats from "../player/MainStats"
 import MainScene from "../CodeLuna"
-import GameConstants, { BLOCK_RES, HIDE_POS, GUI_DEPTH, WINDOW, GUI_SIZE, GUI_SECONDARY_SIZE, GUI_MARGIN, TEXT_SPACING, TOOLBOX_WIDTH, TOOLBOX_SPACING, FACTORY_BLOCK, PART_GUN_NAME, WELDER_PART, F0, RESOURCE_TRANSFER_AMOUNT, RESOURCE_TRANSFER_INTERVAL_MS } from "../main/constants"
+import GameConstants, { BLOCK_RES, HIDE_POS, GUI_DEPTH, WINDOW, GUI_SIZE, GUI_SECONDARY_SIZE, GUI_MARGIN, MONITOR_GAP, TEXT_SPACING, TOOLBOX_WIDTH, TOOLBOX_SPACING, FACTORY_BLOCK, PART_GUN_NAME, WELDER_PART, F0, RESOURCE_TRANSFER_AMOUNT, RESOURCE_TRANSFER_INTERVAL_MS } from "../main/constants"
 import MyColors from "../main/MyColors"
 import ModularRobot from "../bots/ModularRobot"
 import CpuPart, { GuiState } from "../bots/parts-and-blocks/CpuPart"
@@ -116,10 +116,14 @@ export default class GUI {
 
         const closeOnEscape = (event: KeyboardEvent) => {
             if (event.key !== "Escape" || event.repeat || event.isComposing ||
-                !this.monitorOpen) return
+                (!this.monitorOpen && !this.handbook.isVisible)) return
             event.preventDefault()
             event.stopPropagation()
-            this.closeMonitor()
+            if (this.handbook.isVisible && (this.handbookInFront || !this.monitorOpen)) {
+                this.closeBook()
+            } else {
+                this.closeMonitor()
+            }
         }
         window.addEventListener("keydown", closeOnEscape, true)
         this.scene.events.once("shutdown", () => window.removeEventListener("keydown", closeOnEscape, true))
@@ -536,9 +540,9 @@ export default class GUI {
             screen.setPosition(width, topPadding).setSize(size.x, height)
             this.guiRects[index].setSize(size.x, height)
             screenHeight = Math.max(screenHeight, height)
-            width += screen.width + TEXT_SPACING
+            width += screen.width + MONITOR_GAP
         }
-        width += outerPadding - TEXT_SPACING
+        width += outerPadding - MONITOR_GAP
         const height = topPadding + screenHeight + outerPadding + GUI_MARGIN
         this.monitorContainer.setSize(width, height)
             .setPosition((WINDOW.x - width) / 2, (WINDOW.y - height) / 2)

@@ -101,6 +101,16 @@ export function isStorageCapacityReached(stored: number, capacity: number, preci
         Number(stored.toFixed(precision)) >= Number(capacity.toFixed(precision))
 }
 
+export function canContinueMining(
+    stored: number,
+    capacity: number,
+    freeStorage: number,
+    isDrilling: boolean
+) {
+    return !isStorageCapacityReached(stored, capacity) &&
+        (isDrilling || hasMiningCapacity(freeStorage))
+}
+
 export function updateChatScrollOffset(
     scrollOffset: number,
     previousMaxOffset: number,
