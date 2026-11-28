@@ -23,7 +23,7 @@ export const BLOCK_NAMES = [
 
 export const BASIC_ASSET_NAMES = [
     'null', 'icon-lunestone','icon-refined-cosmorite', 'icon-cosmorite',
-    'material-cosmorite-ore',
+    'material-cosmorite-ore', 'rocket', 'closedBook', 'openBook', 'laserTool', 'weld', 'weldTool', 'laserTool', 'boxShadow',
     PART_CPU_NAME,'part-radio-transmitter',PART_DISH_NAME,'part-battery','part-solar-panel', PART_GUN_NAME,
     'structure-base', WHEEL_CHASSIS_NAME,
     'tile-ground'

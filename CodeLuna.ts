@@ -83,6 +83,7 @@ export default class MainScene extends Phaser.Scene {
         })
         this.load.audio("weld", audioPre + "weld.mp3")
         this.load.audio("cancelled", audioPre + "cancelled.mp3")
+        this.load.audio("walking", prefix + "walking.mp3")
         for (const key of PLACE_SOUND_KEYS) this.load.audio(key, audioPre + "place.mp3")
         this.painSound = new Audio(prefix + "audio/pain.mp3")
     }
@@ -92,7 +93,7 @@ export default class MainScene extends Phaser.Scene {
             loop: true,
             volume: GameConstants.audio.drillingVolume
         })
-        this.walkSound = this.sound.add("walk")
+        this.walkSound = this.sound.add("walking", { loop: true })
         this.robotMoveSound = this.sound.add("robotMove")
         this.input.setTopOnly(true)
         /// CAMERA ///

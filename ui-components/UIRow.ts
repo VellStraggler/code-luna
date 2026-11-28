@@ -1,9 +1,9 @@
 import { TEXT_SPACING } from "../main/constants"
 import UIComponent from "./UIComponent"
 import { UITextLine } from "./StatMessage"
-import type UIColumn from "./UITextColumn"
+import type UIColumn from "./UIColumn"
 
-export default class UITextRow implements UIComponent {
+export default class UIRow implements UIComponent {
     private readonly children: UIComponent[] = []
     private x: number
     private y: number

@@ -124,7 +124,7 @@ export default class ModularBlock extends BaseGameItem {
         const sparkY = (this.image.y + otherBlock.image.y) / 2
         this.robot.position = xy(this.image.x, this.image.y).subtract(this.localPos)
         this.robot.absorb(otherBlock.robot, offset)
-        const spark = this.scene.add.image(sparkX, sparkY, "null")
+        const spark = this.scene.add.image(sparkX, sparkY, "weld")
             .setDepth(BLOCK_DEPTH + 1)
         this.scene.uiCamera.ignore(spark)
         this.scene.addWorldObject(spark)

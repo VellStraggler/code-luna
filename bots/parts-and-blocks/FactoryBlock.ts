@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser'
 import MainScene from "../../CodeLuna"
-import GameConstants, { BLOCK_RES, Dirs } from "../../main/constants"
+import GameConstants, { BLOCK_RES, Dirs, PART_DRILL_NAME } from "../../main/constants"
 import { xy, XY } from "../../main/XY"
 import ModularRobot from "../ModularRobot"
 import { BlockDefinition } from "./BlockDefinition"
@@ -128,8 +128,10 @@ export default class FactoryBlock extends ModularBlock {
         block.printedBy = this
         const parts = [...this.selectedParts]
         for (const partType of parts) block.addPart(this.scene, partType, printed)
-        block.modularParts.forEach((part, index) => {
-            part.assignPosition(parts.length, index)
+        const positionedParts = block.modularParts.filter(part => part.assetKey !== PART_DRILL_NAME)
+        block.modularParts.filter(part => part.assetKey === PART_DRILL_NAME).forEach(part => part.assignPosition(1, 0))
+        positionedParts.forEach((part, index) => {
+            part.assignPosition(positionedParts.length, index)
             part.localPos = part.localPos.multiply(BLOCK_RES)
         })
         printed.reload()

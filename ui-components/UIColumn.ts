@@ -4,7 +4,7 @@ import GameGeometry from "../main/GameGeometry";
 import { PlayerState } from "../player/Player";
 import UIComponent, { type UIObject } from "./UIComponent"
 import UIStatLine, { UIFormattedStatLine, UIIconButton, UIIconStatLine, UIStatButtonLine, UITextButtonLine, UITextLine } from "./StatMessage";
-import UITextRow from "./UITextRow"
+import UIRow from "./UIRow"
 
 export default class UIColumn implements UIComponent {
     private scene: MainScene
@@ -145,7 +145,7 @@ export default class UIColumn implements UIComponent {
         return this
     }
 
-    public addRow(row: UITextRow) {
+    public addRow(row: UIRow) {
         return this.addComponent(row)
     }
 
@@ -192,7 +192,7 @@ export default class UIColumn implements UIComponent {
         return this
     }
 
-    public addIconButton(iconName: string, fun: () => boolean, closeMonitor = true) {
+    public addIconButton(iconName: string, fun: () => boolean, closeMonitor = true, onDeselect?: () => void) {
         const button = new UIIconButton(
                 this.scene, 
                 this.x, 
@@ -202,7 +202,7 @@ export default class UIColumn implements UIComponent {
                     if (closeMonitor) this.scene.GUI.selectTool()
                     fun()
                 },
-                () => this.deselectButtons(), this.iconButtons.length + 1)
+                () => this.deselectButtons(), this.iconButtons.length + 1, onDeselect)
         this.iconButtons.push(button)
         this.components.push(button)
         this.latestY += TOOLBOX_WIDTH + TOOLBOX_SPACING

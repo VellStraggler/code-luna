@@ -75,7 +75,7 @@ export class UIIconButton {
     private readonly onClick: () => any
     private readonly deselectAll: () => any
 
-    constructor(scene: MainScene, x: number, y: number, iconName: string = GameConstants.toolbar.defaultIcon, onClick: () => any, deselectAll: () => any, number: number) {
+    constructor(scene: MainScene, x: number, y: number, iconName: string = GameConstants.toolbar.defaultIcon, onClick: () => any, deselectAll: () => any, number: number, private readonly onDeselect?: () => void) {
         this.onClick = onClick
         this.deselectAll = deselectAll
         this.bg = scene.add.rectangle(x, y, TOOLBOX_WIDTH, TOOLBOX_WIDTH, MyColors.green, 0.6)
@@ -111,8 +111,10 @@ export class UIIconButton {
     }
 
     deselect() {
+        const wasSelected = this.selected
         this.selected = false
         this.bg.setStrokeStyle(1, MyColors.white)
+        if (wasSelected) this.onDeselect?.()
     }
 
     activate() {
@@ -123,6 +125,9 @@ export class UIIconButton {
             this.onClick()
             this.select()
         }
+    }
+    setIcon(newIcon: string) {
+        this.icon.setTexture(newIcon)
     }
 
     select() {

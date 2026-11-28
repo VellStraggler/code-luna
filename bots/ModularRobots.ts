@@ -82,7 +82,6 @@ export default class ModularRobots {
                         }
                     }
                     return welded
-                    if (connected) break
                 }
             }
         }

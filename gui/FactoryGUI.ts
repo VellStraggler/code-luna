@@ -34,14 +34,19 @@ export default class FactoryGUI {
             .factory-monitor { display:flex;flex-direction:column;gap:6px; }
             .factory-monitor button { border:1px solid ${MyColors.toCssHex(MyColors.white)};background:transparent;color:inherit;font:inherit;cursor:pointer; }
             .factory-monitor button.selected { outline:2px solid ${MyColors.toCssHex(MyColors.white)}; }
-            .factory-monitor .factory-scroll { display:flex;gap:4px;overflow:auto;min-height:44px; }
+            .factory-monitor .factory-scroll { display:flex;gap:4px;overflow-x:auto;overflow-y:hidden;min-height:48px;padding:2px;scrollbar-width:thin; }
             .factory-monitor .factory-icon { flex:0 0 40px;width:40px;height:40px;padding:2px; }
             .factory-monitor .factory-icon img { width:100%;height:100%;object-fit:contain;image-rendering:pixelated; }
+            .factory-monitor .factory-parts-row { display:flex;align-items:center;gap:6px;min-width:0; }
+            .factory-monitor .factory-parts-row .factory-scroll { flex:1;min-width:0; }
+            .factory-monitor .factory-reset { flex:none; }
             .factory-monitor .factory-direction { position:absolute;width:26px;height:26px; }
             .factory-monitor .factory-status { min-height:20px;white-space:pre-wrap; }
             .factory-monitor .factory-bottom { display:flex;align-items:center;gap:4px;margin-top:auto; }
+            .factory-monitor .factory-resources { display:flex;flex-direction:column;gap:4px; }
+            .factory-monitor .factory-resource-options { display:flex;gap:4px; }
             .factory-monitor .factory-bottom button { min-height:24px;padding:2px 6px; }
-            .factory-monitor .factory-print { width:40px;height:40px;margin-left:auto; }
+            .factory-monitor .factory-print { min-width:60px;height:40px;margin-left:auto;text-align:center; }
         `
         this.element.append(style)
 
@@ -61,6 +66,7 @@ export default class FactoryGUI {
             const button = this.iconButton(definition, () => {
                 if (!this.factory) return
                 this.factory.selectedBlock = definition
+                if (this.factory.selectedParts.size > definition.partLimit) this.factory.selectedParts.clear()
                 this.statusMessage = ""
                 this.update()
             })
@@ -68,14 +74,13 @@ export default class FactoryGUI {
             blockList.append(button)
         })
         this.partLabel = document.createElement("div")
-        const partHeader = document.createElement("div")
-        partHeader.style.display = "flex"
-        partHeader.style.justifyContent = "space-between"
-        partHeader.append(this.partLabel, this.button(GameConstants.text.factoryReset, () => {
+        const reset = this.button(GameConstants.text.factoryReset, () => {
             this.factory?.selectedParts.clear()
             this.statusMessage = ""
             this.update()
-        }))
+        }, "factory-reset")
+        const partRow = document.createElement("div")
+        partRow.className = "factory-parts-row"
         const partList = document.createElement("div")
         partList.className = "factory-scroll"
         parts.forEach(definition => {
@@ -89,6 +94,7 @@ export default class FactoryGUI {
             this.partButtons.set(definition, button)
             partList.append(button)
         })
+        partRow.append(partList, reset)
 
         const directionGlyphs: Record<Dirs, string> = {
             [Dirs.up]: "\u25B2",
@@ -129,7 +135,12 @@ export default class FactoryGUI {
         bottom.className = "factory-bottom"
         const resourceLabel = document.createElement("span")
         resourceLabel.textContent = GameConstants.text.factoryResources
-        bottom.append(resourceLabel)
+        const resources = document.createElement("div")
+        resources.className = "factory-resources"
+        const resourceOptions = document.createElement("div")
+        resourceOptions.className = "factory-resource-options"
+        resources.append(resourceLabel, resourceOptions)
+        bottom.append(resources)
         for (const [fromUser, label] of [
             [true, GameConstants.text.factoryFromUser],
             [false, GameConstants.text.factoryFromBot]
@@ -141,14 +152,14 @@ export default class FactoryGUI {
                 this.update()
             })
             this.resourceButtons.set(fromUser, button)
-            bottom.append(button)
+            resourceOptions.append(button)
         }
         bottom.append(this.button(GameConstants.text.factoryPrint, () => {
             if (!this.factory) return
             this.statusMessage = this.factory.print()
             this.update()
         }, "factory-print"))
-        this.element.append(blockLabel, blockList, partHeader, partList, this.status, bottom)
+        this.element.append(blockLabel, blockList, this.partLabel, partRow, this.status, bottom)
         parent.append(this.element)
         this.scene.events.once("shutdown", () => this.element.remove())
     }

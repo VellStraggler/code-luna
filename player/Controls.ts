@@ -93,6 +93,7 @@ export default class Controls {
     updateMovement(speed: number) {
         if (this.isTyping()) {
             this.player.setVelocity(0, 0)
+            if (this.wasMoving) this.scene.walkSound.stop()
             this.wasMoving = false
             return
         }
@@ -128,6 +129,7 @@ export default class Controls {
         this.player.setVelocity(goX * speed, goY * speed)
         const moving = goX !== 0 || goY !== 0
         if (moving && !this.wasMoving) this.scene.walkSound.play()
+        else if (!moving && this.wasMoving) this.scene.walkSound.stop()
         this.wasMoving = moving
     }
 

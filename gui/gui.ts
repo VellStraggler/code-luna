@@ -5,7 +5,7 @@ import GameConstants, { BLOCK_RES, HIDE_POS, GUI_DEPTH, WINDOW, GUI_SIZE, GUI_SE
 import MyColors from "../main/MyColors"
 import ModularRobot from "../bots/ModularRobot"
 import CpuPart, { GuiState } from "../bots/parts-and-blocks/CpuPart"
-import UIColumn from "../ui-components/UITextColumn"
+import UIColumn from "../ui-components/UIColumn"
 import RobotFunctionEditor from "./RobotFunctionEditor"
 import FactoryBlock from "../bots/parts-and-blocks/FactoryBlock"
 import FactoryGUI from "./FactoryGUI"
@@ -595,15 +595,18 @@ export default class GUI {
             true,
             "right"
         )
-            .addIconButton(PART_GUN_NAME, () => this.scene.player.toggleHoldingGun())
-            .addIconButton(WELDER_PART + F0, () => this.scene.player.toggleHoldingWelder())
+            .addIconButton("laserTool", () => this.scene.player.toggleHoldingGun())
+            .addIconButton("weldTool", () => this.scene.player.toggleHoldingWelder())
             .addIconButton(FACTORY_BLOCK, () => this.scene.player.toggleHoldingFactoryBlock())
-            .addIconButton("null", () => {
+            .addIconButton("closedBook", () => {
                 this.scene.player.playerState = PlayerState.holdingHandbook
                 this.handbook.setVisible(true)
                 this.bringBookForward()
+                this.playerTools.iconButtons[3].setIcon("openBook")
                 return true
-            }, false)
+            }, false, () => {
+                if (this.handbook.isVisible) this.closeBook()
+            })
     }
 
     private initCpuGUI() {
@@ -988,10 +991,11 @@ export default class GUI {
 
     public closeBook() {
         this.handbook.setVisible(false)
+        this.playerTools.iconButtons[3].setIcon("closedBook")
         if (this.scene.player.playerState === PlayerState.holdingHandbook) {
             this.scene.player.playerState = PlayerState.holdingNothing
-            this.playerTools.iconButtons.forEach(button => button.deselect())
         }
+        this.playerTools.iconButtons[3].deselect()
         this.bringMonitorForward()
     }
 
@@ -1023,7 +1027,7 @@ export default class GUI {
         this.mainStats.incGas(-(amount + GameConstants.game.launchGasCost))
         this.launchAmount = 0
         const bounds = this.scene.playerBase.getBounds()
-        const rocket = this.scene.add.image(bounds.left, bounds.top, "null")
+        const rocket = this.scene.add.image(bounds.left, bounds.top, "rocket")
         this.scene.addWorldObject(rocket)
         this.scene.tweens.add({
             targets: rocket,
@@ -1075,7 +1079,7 @@ export default class GUI {
         if (visible && this.baseGUI.isVisible) return
         if (this.factoryGUI.isVisible === visible) return
         if (visible) {
-            this.playerTools.deselectButtons()
+            if (this.scene.player.playerState !== PlayerState.holdingHandbook) this.playerTools.deselectButtons()
             this.bringMonitorForward()
             const cpu = this.cpuOfGUI
             if (cpu) cpu.guiState = GuiState.closed
@@ -1101,7 +1105,7 @@ export default class GUI {
         if (visible) {
             this.robotGUI.setVisibility(false)
             this.robotStatsGUI.setVisibility(false)
-            this.playerTools.deselectButtons()
+            if (this.scene.player.playerState !== PlayerState.holdingHandbook) this.playerTools.deselectButtons()
             this.bringMonitorForward()
         }
         this.baseGUI.setVisibility(visible)
@@ -1113,7 +1117,7 @@ export default class GUI {
         if(this.robotGUI.isVisible == visible) return
         if (visible) {
             this.baseGUI.setVisibility(false)
-            this.playerTools.deselectButtons()
+            if (this.scene.player.playerState !== PlayerState.holdingHandbook) this.playerTools.deselectButtons()
             this.bringMonitorForward()
         }
         this.robotGUI.setVisibility(visible)
